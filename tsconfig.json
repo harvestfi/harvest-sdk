@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "resolveJsonModule": true
+  },
+  "include": ["./scripts", "./test"],
+  "files": ["./hardhat.config.ts"]
+}
+
+//{
+//  "compilerOptions": {
+//    "target": "ES2019",
+//    "module": "commonjs",
+////    "lib": ["ES6"],
+//    "strict": true,
+//    "esModuleInterop": true,
+//    "outDir": "dist",
+//    "moduleResolution": "node"
+//  },
+//  "compilerOptions": {
+//    "target": "es6",
+//    "lib": [
+//      "es6",
+//      "dom"
+//    ],
+////    "rootDirs": ["./src", "./scripts", "./test"],
+//    "module": "commonjs",
+//    "moduleResolution": "node",
+//    "strict": true,
+//    "declaration": false,
+//    "sourceMap": true,
+//    "inlineSources": true,
+//    "types": [
+//      "node"
+//    ],
+//    "stripInternal": true,
+//    "incremental": true,
+//    "skipLibCheck": true,
+////    "importsNotUsedAsValues": "error",
+//    "inlineSourceMap": false,
+//    "noEmit": false,
+//    "paths": { "~/*": ["src/*"] }
+//  },
+//  "include": ["./test", "./src", "./scripts"],
+//  "exclude": ["node_modules"],
+//  "files": ["./hardhat.config.ts"]//,
+////  "ts-node": {
+////    "compilerOptions": {
+////      "module": "ESNext" // or ES2015, ES2020
+////    }
+////  }
+//}

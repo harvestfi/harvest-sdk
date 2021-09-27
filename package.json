@@ -1,0 +1,44 @@
+{
+  "name": "harvest-sdk",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "package": "zip -r package.zip node_modules && zip -ur package.zip src/* && zip -u package.zip networks.config.js",
+    "test": "mocha -r ts-node/register test/**/*.spec.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^5.4.1",
+    "node-fetch": "^2.6.2",
+    "@types/node-fetch": "2.5.12",
+    "@uniswap/v3-sdk": "^3.5.1",
+    "@uniswap/sdk-core": "^3.0.1"
+  },
+  "devDependencies": {
+    "dotenv": "^10.0.0",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.4.3",
+    "tsconfig-paths": "^3.11.0",
+    "@typechain/hardhat": "^2.3.0",
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-etherscan": "^2.1.4",
+    "@nomiclabs/hardhat-truffle5": "^2.0.0",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@openzeppelin/contracts": "^4.1.0",
+    "@openzeppelin/contracts-ethereum-package": "^3.0.0",
+    "@openzeppelin/test-helpers": "^0.5.11",
+    "@openzeppelin/upgrades": "^2.8.0",
+    "@types/chai": "^4.2.21",
+    "@types/mocha": "^9.0.0",
+    "mocha": "^9.1.1",
+    "chai": "^4.3.4",
+    "hardhat": "^2.6.0",
+    "hardhat-gas-reporter": "1.0.4",
+    "nyc": "^15.1.0",
+    "y18n": "^5.0.8"
+  }
+}
