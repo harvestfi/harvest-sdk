@@ -1,9 +1,10 @@
 import * as dotenv from 'dotenv';
-import {expect} from 'chai';
-import {HarvestSDK} from "../src/harvest";
-import {Chain} from "../src/enums";
-import {BigNumber, ethers} from "ethers";
+import {ethers} from "hardhat";
 import {withImpersonation} from "./utils";
+import {expect} from 'chai';
+import {HarvestSDK, InvalidAmountError} from "../src/harvest";
+import {Chain} from "../src/chain";
+import {BigNumber} from "ethers";
 import vaultAbi from '../src/abis/vault.json';
 
 const erc20 = require('@openzeppelin/contracts/build/contracts/ERC20.json');
@@ -16,7 +17,7 @@ describe('Harvest SDK', async () => {
     const pfcrvTricrypto = "0xfbfbe380489882831dad5258cfd2e29307e23b82"; //
     const crvTricrypto = '0xc4AD29ba4B3c580e6D59105FFf484999997675Ff';
 
-    describe("tokens", async()  => {
+    describe("tokens", async () => {
         it('should allow me to gets tokens by name', async () => {
             const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
             const erc20 = await harvest.erc20s();
@@ -34,7 +35,6 @@ describe('Harvest SDK', async () => {
 
         }).timeout(20000);
     });
-
 
 
     it('should allow me to gets vaults by name', async () => {
@@ -83,16 +83,32 @@ describe('Harvest SDK', async () => {
 
     }).timeout(20000);
 
-    it("should complain if i ask for a larger balance to withdraw",  async() => {
+    it("should complain if i ask for a larger balance to withdraw", async () => {
+        await withImpersonation(addr)(async (signer) => {
+
+            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
+            const vaults = await harvest.vaults();
+
+            const maybeVault = vaults.findByName("crvTricrypto");
+            // this is the balance of the ftoken version of the lp position
+            const farmCrvTricryptoBalance = await maybeVault.balanceOf(addr);
+
+            // withdraw funds greater than balance from vault contract
+            try {
+                await harvest.withdraw(maybeVault, farmCrvTricryptoBalance.add(1), signer);
+                expect(true).to.eq(false, "Should not be able to withdraw a larger balance");
+            } catch (e) {
+                expect(e).to.be.instanceOf(InvalidAmountError);
+            }
+        });
+    }).timeout(20000);
+
+    it("should allow me to stake and unstake a farm wrapped token", async () => {
+
         expect(true).to.be.eq(false);
     }).timeout(20000);
 
-    it("should allow me to stake and unstake a farm wrapped token",  async() => {
-
-        expect(true).to.be.eq(false);
-    }).timeout(20000);
-
-    it("should allow me to approve and deposit a token", async() => {
+    it("should allow me to approve and deposit a token", async () => {
         // buy a new LP token?
         // get the vault
         // approve the amount for the vault
@@ -103,6 +119,53 @@ describe('Harvest SDK', async () => {
 
         expect(true).to.be.eq(false);
     });
+
+    it("should allow me to list all my available LP token deposits", async () => {
+        await withImpersonation(addr)(async (signer) => {
+            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
+            const myVaults = await harvest.myVaults(addr);
+            const res = myVaults.reduce((acc: { [key: string]: string }, {vault, balance}) => {
+                // console.log(`${vault.name} : ${ethers.utils.formatUnits(balance, vault.decimals)}`);
+                const name = vault.name||"";
+                acc[name] = ethers.utils.formatUnits(balance, vault.decimals);
+                return acc;
+            }, {});
+
+            const expectedFixture = {
+                "UniV3_ETH_sETH2": "0.33488586169364782",
+                "UniV3_zUSD_USDC_full_range": "0.000001060355899832",
+                "UniV3_zUSD_ETH": "1.475777225514812291",
+                "crvTriCrypto": "0.029116707575365064",
+                "UniV3_USDC_ETH": "0.000000208218158038",
+                "UniV3_ETH_USDT": "0.000000211406592338",
+                "Univ3_BUSD_USDC": "0.142559907390608712",
+                "Univ3_renBTC_wBTC": "0.00000000023879433",
+                "UniV3_UST_USDT": "0.001449542257980817",
+                "UniV3_USDC_USDT": "0.000000015028386154",
+                "UniV3_FCASH_USDC": "0.000141102855052733",
+                "DAI": "9.466967797837333916",
+                "SUSHI-ETH-USDT": "0.000001565689421587",
+                "SUSHI-ETH-WBTC": "0.000000004271633019",
+                "SUSHI-ETH-UST": "0.1",
+                "SUSHI_HODL": "0.709055162810598698",
+                "ThreePool": "0.931547681643812964",
+                "crvCOMPOUND": "34.013545934721615321",
+                "crvUST": "23.807288403558042523",
+                "IFARM": "1.439660830690097681",
+                "BAC-DAI": "9.397598807784457362",
+                "DAI-BAS": "0.228672655401473315",
+                "Univ3_USDT_ETH_1400_2400": "0.000000401774118905",
+                "DAI-BSG": "0.073921291180446681",
+                "DAI-BSGS": "1.497320546865380535",
+                "Univ3_DPI_ETH": "0.166488537731537337",
+                "UniV3_REI_ETH": "0.054134893184588336",
+                "UniV3_REI_wBTC": "0.000199999999972459",
+                "Univ3_DAI_ETH_1400_2400": "0.578979189024665702",
+            };
+
+            expect(res).to.deep.eq(expectedFixture);
+        });
+    }).timeout(40000);
 });
 
 

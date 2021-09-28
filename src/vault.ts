@@ -2,7 +2,7 @@
  * Represents an ERC20 token with a unique address and some metadata.
  */
 import {BigNumber, ethers, Signer} from "ethers";
-import {Chain} from "./enums";
+import {Chain} from "./chain";
 import vaultAbi from './abis/vault.json';
 import {Token} from "./token";
 
@@ -38,7 +38,7 @@ export class Vault {
 
 export class Vaults {
 
-    private vaults: Vault[];
+    readonly vaults: Vault[];
 
     constructor(vaults: Vault[]) {
         this.vaults = vaults;

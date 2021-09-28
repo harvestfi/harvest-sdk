@@ -2,9 +2,11 @@ import {BigNumber, ethers} from "ethers";
 import fetch from "node-fetch";
 import {chainFilter} from "./filters";
 import {Erc20s, Token} from "./token";
-import {Chain} from "./enums";
+import {Chain} from "./chain";
 import {Vault, Vaults} from "./vault";
 import vaultAbi from './abis/vault.json'
+
+export class InvalidAmountError extends Error {}
 
 export class HarvestSDK {
 
@@ -26,10 +28,17 @@ export class HarvestSDK {
         const contract = new ethers.Contract(vault.address, vaultAbi, signer);
         // check balance
         // cap at max balance (if supplied over the limit)
+        if(!await this.checkBalance(contract, await signer.getAddress(), amount)){
+            throw new InvalidAmountError();
+        }
         const tx = await contract.withdraw(amount);
-        await tx.wait();
+        return await tx.wait();
     }
 
+    /**
+     * Produce a list of all the erc20s that the project encompasses.
+     * @return Promise<Erc20s>
+     */
     erc20s(): Promise<Erc20s> {
         const theFilter = chainFilter(this.network as Chain);
         return fetch("https://harvest.finance/data/tokens.json").then(_ => _.json()).then(_ => _.data).then((tokens: any) => {
@@ -41,6 +50,10 @@ export class HarvestSDK {
         });
     }
 
+    /**
+     * Return a vaults object which contains all the vaults that are described
+     * by the harvest api tokens endpoint.
+     */
     vaults(): Promise<Vaults> {
         const theFilter = chainFilter(this.network as Chain);
         return fetch("https://harvest.finance/data/tokens.json").then(_ => _.json()).then(_ => _.data).then((tokens: any) => {
@@ -55,16 +68,20 @@ export class HarvestSDK {
         });
     }
 
-    //
-    // private async checkBalance(contract: ethers.Contract, amount: BigNumber): Promise<boolean> {
-    //     const balance = await contract.balanceOf(await this.jsonRpcProvider.getAddress());
-    //     console.log(balance);
-    //     // const decimals = await contract.decimals();
-    //     // const amountInWei = utils.parseUnits(amount, decimals);
-    //     console.log(`Amount of requested withdraw ${amount}`);
-    //     console.log(`Balance of account ${balance}`);
-    //     return balance.toBigInt() > amount.toBigInt();
-    //     // 200000000000000000
-    //     // 29116707575365064
-    // }
+    /**
+     * Fetch all vaults where the address holds a positive balance
+     * @param address
+     */
+    async myVaults(address: string): Promise<{ balance: BigNumber; vault: Vault }[]> {
+        const allVaults = await this.vaults();
+        const vaultBalances = await Promise.all(allVaults.vaults.map(vault => {
+            return vault.balanceOf(address).then(balance => ({vault, balance}));
+        }));
+        return vaultBalances.filter(_ => _.balance.gt(0));
+    }
+
+    private async checkBalance(contract: ethers.Contract, address: string, amount: BigNumber): Promise<boolean> {
+        const balance = await contract.balanceOf(address);
+        return balance.gt(amount);
+    }
 }

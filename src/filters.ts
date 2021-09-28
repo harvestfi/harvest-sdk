@@ -1,5 +1,5 @@
 import {Token} from "./token";
-import {Chain} from "./enums";
+import {Chain} from "./chain";
 
 export const chainFilter = (chain: Chain) => (token: any) => {
     return parseInt(token.chain) === chain;

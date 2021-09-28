@@ -1,7 +1,7 @@
 /**
  * Represents an ERC20 token with a unique address and some metadata.
  */
-import {Chain} from "./enums";
+import {Chain} from "./chain";
 import {BigNumber, ethers} from "ethers";
 import vaultAbi from "./abis/vault.json";
 
