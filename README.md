@@ -15,6 +15,28 @@ Put this at the top of your tests cases:
     const ethers = hre.ethers;
     
 
+# Usage
+
+## List all of my available tokens that I could deposit and stake
+
+    // initialise the harvest SDK
+    const harvest = new HarvestSDK(ethers.defaultProvider());
+    
+    (await harvest.myVaults()).foreach(vault => {
+        console.log(vault.name, await vault.balanceOf(<MY ADDR>));    
+    });
+
+## Deposit and stake all of a token
+
+    // initialise the harvest SDK
+    const harvest = new HarvestSDK(ethers.defaultProvider());
+    
+    // find the crvtricrypto vault
+    const crvTriCryptoVault = (await harvest.vaults()).findVaultByName("crvtricrypto"); // search is case insensitive
+    
+    // deposit and stake ALL your crvTricrypto LP (liquidity pool) tokens.
+    await harvest.depositAndStake(crvTriCryptoVault);
+
 
 # Intro
 

@@ -15,6 +15,7 @@ export class Vault {
      * The contract address on the chain on which this token lives
      */
     private signerOrProvider: ethers.Signer | ethers.providers.Provider;
+    private contract: ethers.Contract;
     readonly address: string;
     readonly chainId: Chain;
     readonly decimals: number;
@@ -23,6 +24,7 @@ export class Vault {
 
     constructor(signerOrProvider: ethers.Signer|ethers.providers.Provider, chainId: Chain, address: string, decimals: number, tokens: string[], name?: string) {
         this.signerOrProvider = signerOrProvider;
+        this.contract = new ethers.Contract(address, vaultAbi, signerOrProvider);
         this.address = address;
         this.chainId = chainId;
         this.decimals = decimals;
@@ -31,19 +33,21 @@ export class Vault {
     }
 
     async balanceOf(address: Address): Promise<BigNumber> {
-        const contr = new ethers.Contract(this.address, vaultAbi, this.signerOrProvider);
-        return await contr.balanceOf(address);
+        return await this.contract.balanceOf(address);
     }
 
     async approve(spender: Address, amount: BigNumber): Promise<ContractReceipt> {
-        const contr = new ethers.Contract(this.address, vaultAbi, this.signerOrProvider);
-        const tx = await contr.approve(spender, amount);
+        const tx = await this.contract.approve(spender, amount);
+        return await tx.wait();
+    }
+
+    async deposit(amount: BigNumber): Promise<ContractReceipt> {
+        const tx = await this.contract.deposit(amount);
         return await tx.wait();
     }
 
     async getPricePerFullShare(): Promise<BigNumber> {
-        const contr = new ethers.Contract(this.address, vaultAbi, this.signerOrProvider);
-        return await contr.getPricePerFullShare();
+        return await this.contract.getPricePerFullShare();
     }
 
     underlying() {

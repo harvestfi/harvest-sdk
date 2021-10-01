@@ -8,6 +8,7 @@ import vaultAbi from './abis/vault.json'
 import poolAbi from './abis/pool.json'
 import {Pool, Pools} from "./pool";
 import {
+    InsufficientApprovalError,
     InsufficientBalanceError,
     InsufficientPoolBalanceError,
     InsufficientVaultBalanceError,
@@ -25,7 +26,7 @@ export class HarvestSDK {
     }
 
     /**
-     * Approve an underlying token contract (lp position or single token) for a vault
+     * Approve a vault to spend the underlying token (belonging to the depositor)
      * If the underlying is already approved, don't approve for additional spend
      * @param vault
      * @param amount
@@ -49,10 +50,9 @@ export class HarvestSDK {
      * @param signer
      */
     async deposit(vault: Vault, amount: BigNumber) {
-        // @TODO need an approved deposit spend here.
-        const vaultContract = new Contract(vault.address, vaultAbi, this.signerOrProvider);
-        const depositTx = await vaultContract.deposit(amount);
-        await depositTx.wait();
+        if(await this.checkAtLeast(vault.underlying(), await (this.signerOrProvider as Signer).getAddress(), vault.address, amount)){
+            await vault.deposit(amount);
+        } else throw new InsufficientApprovalError("Insufficient amount approved");
     }
 
     /**
@@ -210,5 +210,17 @@ export class HarvestSDK {
     private async checkBalance(contract: ethers.Contract, address: string, amount: BigNumber): Promise<boolean> {
         const balance = await contract.balanceOf(address);
         return balance.gte(amount);
+    }
+
+    /**
+     * Check the spender is authorised to spend the amount of the owner's funds.
+     * @param contract
+     * @param owner
+     * @param spender
+     * @param amount
+     */
+    private async checkAtLeast(contract: ethers.Contract, owner: string, spender: string, amount: BigNumber) {
+        const allowance = await contract.allowance(owner, spender);
+        return allowance.gte(amount);
     }
 }
