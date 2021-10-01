@@ -1,11 +1,15 @@
 import * as dotenv from 'dotenv';
-import {ethers} from "hardhat";
 import {withImpersonation} from "./utils";
 import {expect} from 'chai';
-import {HarvestSDK, InvalidAmountError} from "../src/harvest";
+import {HarvestSDK} from "../src/harvest";
 import {Chain} from "../src/chain";
 import {BigNumber} from "ethers";
 import vaultAbi from '../src/abis/vault.json';
+import wethAbi from '../src/abis/weth.json';
+import {InsufficientVaultBalanceError, InvalidAmountError} from "../src/errors";
+
+const hre = require("hardhat");
+const ethers = hre.ethers;
 
 const erc20 = require('@openzeppelin/contracts/build/contracts/ERC20.json');
 const addr = '0x7BA605bC00eA26512a639D5e0335EAEb3e81aD94';
@@ -17,10 +21,26 @@ describe('Harvest SDK', async () => {
     const pfcrvTricrypto = "0xfbfbe380489882831dad5258cfd2e29307e23b82"; //
     const crvTricrypto = '0xc4AD29ba4B3c580e6D59105FFf484999997675Ff';
 
+    beforeEach(async () => {
+        return await hre.network.provider.request({
+            method: "hardhat_reset",
+            params: [
+                {
+                    forking: {
+                        jsonRpcUrl: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_ETH_API_KEY}`,
+                        blockNumber: 13332361,
+                    },
+                },
+            ],
+        });
+    });
+
     describe("tokens", async () => {
         it('should allow me to gets tokens by name', async () => {
-            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
-            const erc20 = await harvest.erc20s();
+
+            const [signer] = await ethers.getSigners();
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const erc20 = await harvest.erc20s(Chain.ETH);
 
             const usdcByName = erc20.findTokenByName("USDC");
             const wethByName = erc20.findTokenByName("WETH");
@@ -36,27 +56,100 @@ describe('Harvest SDK', async () => {
         }).timeout(20000);
     });
 
+    describe("vaults", async () => {
 
-    it('should allow me to gets vaults by name', async () => {
+        it('should allow me to gets vaults by name', async () => {
+            await withImpersonation(addr)(async (signer) => {
+                const harvest = new HarvestSDK(signer); // eth mainnet
+                const vaults = await harvest.vaults(Chain.ETH);
+
+                const maybeVault = vaults.findByName("crvTricrypto");
+                // should only be 1 vault with this name.
+                expect(maybeVault).to.not.be.eq(undefined);
+                expect(maybeVault?.address).to.be.eq(farm_crvTricypto);
+                expect(maybeVault.tokens[0]).to.be.eq(crvTricrypto);
+            });
+
+        }).timeout(20000);
+
+    });
+
+    it("should complain when i have zero allowance", async () => {
+
+        const [signer] = (await ethers.getSigners());
+
+        const weth = new ethers.Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', wethAbi, signer);
+        // swap eth for weth using the weth contract (pre-amble)
+        await weth.deposit({value: ethers.utils.parseEther("1")});
+
+        const harvest = new HarvestSDK((signer)); // eth mainnet
+        const vaults = await harvest.vaults(Chain.ETH);
+
+        const wethVault = vaults.findByName("WETH");
+        const wethVaultBalanceBefore = await wethVault.balanceOf(await signer.getAddress());
+
+        expect(wethVaultBalanceBefore.toNumber()).to.be.eq(0); // preliminary expectation that a new user has a zero balance in the weth vault
+
+        try {
+            await harvest.deposit(wethVault, BigNumber.from(123));
+            expect(true).to.be.eq(false, "The deposit should fail, not succeed.");
+        } catch(e){
+            // hide the exception this is expected to fail
+        }
+
+    });
+
+    it("should allow me to deposit into a single token vault", async () => {
+
+        const [signer] = (await ethers.getSigners());
+        const signerAddress = await signer.getAddress();
+
+        const weth = new ethers.Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', wethAbi, signer);
+        // swap eth for weth using the weth contract (pre-amble)
+        const amountInGwei = ethers.utils.parseEther("1");
+        await weth.deposit({value: amountInGwei});
+
+        const harvest = new HarvestSDK(signer); // eth mainnet
+        const vaults = await harvest.vaults(Chain.ETH);
+
+        const wethVault = vaults.findByName("WETH");
+        const balanceBefore = await wethVault.balanceOf(signerAddress);
+
+        await harvest.approve(wethVault, amountInGwei);
+        await harvest.deposit(wethVault, amountInGwei);
+        expect((await wethVault.balanceOf(signerAddress)).gt(balanceBefore)).to.be.eq(true);
+
+    });
+
+    it("should allow me to deposit into lp token vault", async () => {
         await withImpersonation(addr)(async (signer) => {
-            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
-            const vaults = await harvest.vaults();
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
 
-            const maybeVault = vaults.findByName("crvTricrypto");
-            // should only be 1 vault with this name.
-            expect(maybeVault).to.not.be.eq(undefined);
-            expect(maybeVault?.address).to.be.eq(farm_crvTricypto);
-            expect(maybeVault.tokens[0]).to.be.eq(crvTricrypto);
+            const crvTriCryptoVault = vaults.findByName("crvtricrypto");
 
-        })
+            /**
+             * withdraw from the vault to start with, and we should get our LP token back into our wallet
+             * - this saves us having to purchase more crvtricrypto tokens from curve.fi
+             */
+            await harvest.withdraw(crvTriCryptoVault, await crvTriCryptoVault.balanceOf(await signer.getAddress()));
 
-    }).timeout(20000);
+            const underlyingContract = crvTriCryptoVault.underlying();
+            const underlyingCrvTriCryptoBalance = await underlyingContract.balanceOf(await signer.getAddress());
+            expect(underlyingCrvTriCryptoBalance.gt(0)).to.be.eq(true);
 
-    it('should allow me withdraw a valid balance', async () => {
+            // ought to work as we've previously approved.
+            await harvest.approve(crvTriCryptoVault, underlyingCrvTriCryptoBalance);
+            await harvest.deposit(crvTriCryptoVault, underlyingCrvTriCryptoBalance);
+
+        });
+    });
+
+    it('should allow me to withdraw a valid balance', async () => {
         await withImpersonation(addr)(async (signer) => {
 
-            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
-            const vaults = await harvest.vaults();
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
 
             const maybeVault = vaults.findByName("crvTricrypto");
             // this is the balance of the ftoken version of the lp position
@@ -64,20 +157,19 @@ describe('Harvest SDK', async () => {
             // expect non-zero balance for test wallet
             expect(farmCrvTricryptoBalance.toString()).to.be.eq("29116707575365064");
             // crvTricrypto contract (owned by curve). the vault wraps this token.
-            const crvTricryptoContr = new ethers.Contract(maybeVault.tokens[0], erc20.abi, signer);
+            const crvTricryptoContr = maybeVault.underlying();
 
             //  farmCrvTricrypto contract (owned by  harvest) will have a share value
             const farmCrvTricryptoContr = new ethers.Contract(farm_crvTricypto, vaultAbi, signer);
-            const sharePrice = (await farmCrvTricryptoContr.getPricePerFullShare())
+            const sharePrice = (await farmCrvTricryptoContr.getPricePerFullShare());
             // calculate expected return from the vault.
             const expectedReturn = farmCrvTricryptoBalance.mul(sharePrice).div(BigNumber.from(10).pow(18));
 
             // withdraw funds from vault contract
-            await harvest.withdraw(maybeVault, farmCrvTricryptoBalance, signer);
+            await harvest.withdraw(maybeVault, farmCrvTricryptoBalance);
 
             // expect crvTricrypto balance to be back in wallet.
             const walletBalance = await crvTricryptoContr.balanceOf(addr);
-
             expect(walletBalance.toString()).to.be.eq(expectedReturn.toString());
         });
 
@@ -86,16 +178,16 @@ describe('Harvest SDK', async () => {
     it("should complain if i ask for a larger balance to withdraw", async () => {
         await withImpersonation(addr)(async (signer) => {
 
-            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
-            const vaults = await harvest.vaults();
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
 
             const maybeVault = vaults.findByName("crvTricrypto");
             // this is the balance of the ftoken version of the lp position
             const farmCrvTricryptoBalance = await maybeVault.balanceOf(addr);
 
-            // withdraw funds greater than balance from vault contract
             try {
-                await harvest.withdraw(maybeVault, farmCrvTricryptoBalance.add(1), signer);
+                // withdraw funds greater than balance from vault contract
+                await harvest.withdraw(maybeVault, farmCrvTricryptoBalance.add(1));
                 expect(true).to.eq(false, "Should not be able to withdraw a larger balance");
             } catch (e) {
                 expect(e).to.be.instanceOf(InvalidAmountError);
@@ -103,30 +195,137 @@ describe('Harvest SDK', async () => {
         });
     }).timeout(20000);
 
-    it("should allow me to stake and unstake a farm wrapped token", async () => {
+    it("should allow me to stake and unstake a vault token", async () => {
+        await withImpersonation(addr)(async (signer) => {
 
-        expect(true).to.be.eq(false);
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
+
+            const maybeVault = vaults.findByName("crvTricrypto");
+            // this is the balance of the ftoken version of the lp position
+            const farmCrvTricryptoOriginalBalance = await maybeVault.balanceOf(addr);
+
+            const pools = await harvest.pools(Chain.ETH);
+            const crvTricryptoPool = pools.findByVault(maybeVault);
+            await maybeVault.approve(crvTricryptoPool.address, farmCrvTricryptoOriginalBalance);
+
+            // stake
+            await harvest.stake(crvTricryptoPool, farmCrvTricryptoOriginalBalance);
+
+            // after stake expect the vault balance to be zero
+            const farmCrvTricryptoBalanceAfterStake = await maybeVault.balanceOf(addr);
+            expect(farmCrvTricryptoBalanceAfterStake.toNumber()).to.be.eq(0);
+
+            //  expect staked balance to equal whatever the vault balance was
+            const stakedBalance = await crvTricryptoPool.balanceOf(await signer.getAddress());
+            expect(stakedBalance.eq(farmCrvTricryptoOriginalBalance)).to.be.eq(true);
+
+            // unstake
+            await harvest.unstake(crvTricryptoPool, stakedBalance);
+            // expect vault balance back to what it was and pool balance now zero
+            const farmCrvTricryptoBalanceAfterUnstake = await maybeVault.balanceOf(addr);
+            expect(farmCrvTricryptoBalanceAfterUnstake.eq(farmCrvTricryptoOriginalBalance)).to.be.eq(true);
+            expect((await crvTricryptoPool.balanceOf(addr)).eq(BigNumber.from(0)));
+
+        });
     }).timeout(20000);
 
-    it("should allow me to approve and deposit a token", async () => {
-        // buy a new LP token?
-        // get the vault
-        // approve the amount for the vault
-        // internal check this amount is valid first
-        // deposit the amount for the vault
-        // internal check this amount is valid first
-        // check vault balance
+    it("should not allow me to stake more vault tokens than I own", async () => {
+        await withImpersonation(addr)(async (signer) => {
 
-        expect(true).to.be.eq(false);
-    });
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
 
+            const maybeVault = vaults.findByName("crvTricrypto");
+            // this is the balance of the ftoken version of the lp position
+            const farmCrvTricryptoBalance = await maybeVault.balanceOf(addr);
+
+            const pools = await harvest.pools(Chain.ETH);
+            const crvTricryptoPool = pools.findByVault(maybeVault);
+            await maybeVault.approve(crvTricryptoPool.address, farmCrvTricryptoBalance);
+
+            try {
+                await harvest.stake(crvTricryptoPool, farmCrvTricryptoBalance.add(1));
+                expect(false).to.be.eq(true, "You should not be able to stake more than you own");
+            } catch(e){
+                expect(e).to.be.instanceOf(InsufficientVaultBalanceError)
+            }
+
+        });
+    }).timeout(20000);
+
+    it("should allow me to approve deposit and stake in 1 step", async() => {
+        await withImpersonation(addr)(async (signer) => {
+
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
+            const pools = await harvest.pools(Chain.ETH);
+            const crvTriCryptoVault = vaults.findByName("crvTricrypto");
+            const crvTriCryptoPool = pools.findByVault(crvTriCryptoVault);
+
+            const address = await signer.getAddress();
+            /**
+             * withdraw from the vault to start with, and we should get our LP token back into our wallet
+             * - this saves us having to purchase more crvtricrypto tokens from curve.fi
+             */
+            await harvest.withdraw(crvTriCryptoVault, await crvTriCryptoVault.balanceOf(address));
+
+            const triCryptoBalance = await crvTriCryptoVault.underlying().balanceOf(address);
+
+            expect((await crvTriCryptoPool.balanceOf(address)).eq(0));
+            /**
+             * Do entire chain of deposit/stake
+             */
+            await harvest.depositAndStake(crvTriCryptoVault, triCryptoBalance, Chain.ETH);
+
+            expect((await crvTriCryptoPool.balanceOf(address)).gt(0));
+
+        });
+    }).timeout(20000);
+
+    it("should allow me to reap the rewards from a pool", async () => {
+        await withImpersonation(addr)(async (signer) => {
+
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const vaults = await harvest.vaults(Chain.ETH);
+            const tokens = await harvest.erc20s(Chain.ETH);
+
+            const maybeFarm = tokens.findTokenByName("iFARM");
+            const maybeVault = vaults.findByName("crvTricrypto");
+            // this is the balance of the ftoken version of the lp position
+            const farmCrvTricryptoBalance = await maybeVault.balanceOf(addr);
+            const currentFarmBalance = await maybeFarm.balanceOf(addr, signer);
+
+            const pools = await harvest.pools(Chain.ETH);
+            const crvTricryptoPool = pools.findByVault(maybeVault);
+            // approve spending the vault value into the pool
+            await maybeVault.approve(crvTricryptoPool.address, farmCrvTricryptoBalance);
+
+            // stack
+            await harvest.stake(crvTricryptoPool, farmCrvTricryptoBalance);
+            // claim rewards for staked position
+            await crvTricryptoPool.claimRewards();
+
+            const newFarmBalance = await maybeFarm.balanceOf(addr, signer);
+            // expect to have an increased rewards balance after at least 1 block tx
+            expect(newFarmBalance.gt(currentFarmBalance)).to.be.eq(true);
+        });
+    }).timeout(20000);
+
+    /**
+     * FYI this might fail if the contracts in the tokens/pools are newer than the block
+     * we're using for testing, in this situation it's advisable to update the block number
+     * in the beforeEach section at the top to a more recent block which should contain the
+     * contract you're after.
+     */
     it("should allow me to list all my available LP token deposits", async () => {
         await withImpersonation(addr)(async (signer) => {
-            const harvest = new HarvestSDK(Chain.ETH); // eth mainnet
-            const myVaults = await harvest.myVaults(addr);
+
+            const harvest = new HarvestSDK(signer); // eth mainnet
+            const myVaults = await harvest.myVaults(addr, Chain.ETH);
             const res = myVaults.reduce((acc: { [key: string]: string }, {vault, balance}) => {
                 // console.log(`${vault.name} : ${ethers.utils.formatUnits(balance, vault.decimals)}`);
-                const name = vault.name||"";
+                const name = vault.name || "";
                 acc[name] = ethers.utils.formatUnits(balance, vault.decimals);
                 return acc;
             }, {});

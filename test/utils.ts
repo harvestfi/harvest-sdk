@@ -1,9 +1,9 @@
 // const networks = require('../networks.config');
 // switch the networks before including hardhat hre
 // networks.hardhat.forking = networks.polygon;
-import * as hre from 'hardhat';
-import {Signer} from "ethers";
+const hre = require("hardhat");
 const ethers = hre.ethers;
+import {Signer} from 'ethers';
 
 export const withImpersonation = (impersonationAddress: string) => async <R>(fn: (signer: Signer)  => Promise<R>) => {
   await hre.network.provider.request({

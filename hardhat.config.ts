@@ -32,8 +32,8 @@ const config: HardhatUserConfig = {
       // allowUnlimitedContractSize: true,
       forking: {
         url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_ETH_API_KEY}`,
-        blockNumber: 13243414,
-        // blockNumber: process.env.ETH_PINNED_BLOCK ? process.env.ETH_PINNED_BLOCK: 13077447
+        blockNumber: process.env.ETH_PINNED_BLOCK ? parseInt(process.env.ETH_PINNED_BLOCK): 13243414
+        // blockNumber: 13243414,
       }
     },
     // ropsten: {

@@ -1,4 +1,22 @@
-# Advanced Sample Hardhat Project
+# Harvest SDK
+
+# Testing
+
+You can run tests by using this command:
+
+    npx hardhat test
+
+It's worth stating that you MUST have the following lines at the top of mocha tests in order to force the loading of ethers to be overwritten by the hardhat environment
+BEFORE ethers is loaded via the harvestsdk class. Thus allowing testing.
+Put this at the top of your tests cases:
+
+    import * as dotenv from 'dotenv';
+    const hre = require("hardhat");
+    const ethers = hre.ethers;
+    
+
+
+# Intro
 
 This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
 

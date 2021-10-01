@@ -23,8 +23,8 @@ export class Token {
         this.name = name;
     }
 
-    balanceOf(address: string): BigNumber {
-        const contr = new ethers.Contract(this.address, vaultAbi, ethers.getDefaultProvider());
+    balanceOf(address: string, signer: ethers.Signer): Promise<BigNumber> {
+        const contr = new ethers.Contract(this.address, vaultAbi, signer);
         return contr.balanceOf(address);
     }
 
