@@ -3,7 +3,8 @@
 // networks.hardhat.forking = networks.polygon;
 const hre = require("hardhat");
 const ethers = hre.ethers;
-import {Signer} from 'ethers';
+import {BigNumber, Signer} from 'ethers';
+import {Vault} from "../src/vault";
 
 export const withImpersonation = (impersonationAddress: string) => async <R>(fn: (signer: Signer)  => Promise<R>) => {
   await hre.network.provider.request({
@@ -17,4 +18,9 @@ export const withImpersonation = (impersonationAddress: string) => async <R>(fn:
     params: [impersonationAddress],
   });
   return res
+};
+
+export const resetBalance = async (vault: Vault) => {
+  // reset approval
+  await vault.underlyingToken().approve("",BigNumber.from(0));
 };

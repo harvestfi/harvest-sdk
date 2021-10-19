@@ -1,12 +1,12 @@
 /**
  * Represents an ERC20 token with a unique address and some metadata.
  */
-import {BigNumber, ContractReceipt, ethers, Signer} from "ethers";
+import {BigNumber, ContractReceipt, ethers} from "ethers";
 import {Chain} from "./chain";
 import vaultAbi from './abis/vault.json';
-import erc20Abi from './abis/erc20.json';
 import {Token} from "./token";
-import {InvalidVaultAddressError, InvalidVaultNameError} from "./errors";
+import {InvalidPoolError, InvalidVaultAddressError, InvalidVaultNameError} from "./errors";
+import {Pool} from "./pool";
 
 type Address = string;
 
@@ -20,20 +20,24 @@ export class Vault {
     readonly chainId: Chain;
     readonly decimals: number;
     readonly tokens: string[];
-    readonly name?: string;
+    readonly symbol: string;
 
-    constructor(signerOrProvider: ethers.Signer|ethers.providers.Provider, chainId: Chain, address: string, decimals: number, tokens: string[], name?: string) {
+    constructor(signerOrProvider: ethers.Signer|ethers.providers.Provider, chainId: Chain, address: Address, decimals: number, tokens: Address[], symbol: string) {
         this.signerOrProvider = signerOrProvider;
-        this.contract = new ethers.Contract(address, vaultAbi, signerOrProvider);
+        this.contract = new ethers.Contract(address, vaultAbi, this.signerOrProvider);
         this.address = address;
         this.chainId = chainId;
         this.decimals = decimals;
         this.tokens = tokens;
-        this.name = name;
+        this.symbol = symbol;
     }
 
     async balanceOf(address: Address): Promise<BigNumber> {
-        return await this.contract.balanceOf(address);
+        try {
+            return await this.contract.balanceOf(address);
+        } catch (e) {
+            return BigNumber.from(0);
+        }
     }
 
     async approve(spender: Address, amount: BigNumber): Promise<ContractReceipt> {
@@ -50,8 +54,12 @@ export class Vault {
         return await this.contract.getPricePerFullShare();
     }
 
-    underlying() {
-        return new ethers.Contract(this.tokens[0], erc20Abi, this.signerOrProvider);
+    /**
+     * This only serves up the first token, in the case of erc721 uniswapv3 this will be wrong.
+     * @todo resolve issues around uniswapv3
+     */
+    underlyingToken(): Token {
+        return new Token(this.signerOrProvider, this.chainId, this.tokens[0], this.decimals, this.symbol);
     }
 
 }
@@ -66,18 +74,20 @@ export class Vaults {
 
     findByName(name: string): Vault {
         const vaults = this.vaults.filter(v => {
-            return v.name?.toLowerCase() === name.toLowerCase();
+            return v.symbol?.toLowerCase() === name.toLowerCase();
         });
         if(vaults.length) return vaults[0];
         else throw new InvalidVaultNameError(`Could not find vault by ${name}`);
 
     }
 
-    findByTokens(...tokens: Token[]): Vault[] {
-        return this.vaults.filter(v => {
+    findByTokens(...tokens: Token[]): Vault {
+        const vaults = this.vaults.filter(v => {
             const a = new Set(v.tokens.map(_ => _.toLowerCase()));
             return v.tokens.length === tokens.length && tokens.map(_ => _.address.toLowerCase()).filter(_ => a.has(_)).length === tokens.length;
-        })
+        });
+        if(vaults.length) return vaults[0];
+        else throw new InvalidVaultAddressError(`Could not find vault by tokens ${tokens.map(_=>_.symbol).join(",")}`);
     }
 
     findByAddress(address: Address): Vault {
@@ -86,5 +96,13 @@ export class Vaults {
         });
         if(vaults.length) return vaults[0];
         else throw new InvalidVaultAddressError(`Could not find vault by ${address}`);
+    }
+
+    findByPool(pool: Pool): Vault {
+        const vaults = this.vaults.filter(vault => {
+            return pool.collateralAddress === vault.address;
+        });
+        if(vaults.length) return vaults[0];
+        else throw new InvalidPoolError(`Could not find vault by pool ${pool.name}[${pool.address}]`);
     }
 }

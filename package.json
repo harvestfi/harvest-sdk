@@ -1,5 +1,5 @@
 {
-  "name": "harvest-sdk",
+  "name": "@harvestfi/harvest-sdk",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
@@ -11,11 +11,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/node-fetch": "2.5.12",
     "ethers": "^5.4.1",
     "node-fetch": "^2.6.2",
-    "@types/node-fetch": "2.5.12",
-    "@uniswap/v3-sdk": "^3.5.1",
-    "@uniswap/sdk-core": "^3.0.1"
+    "npx": "^10.2.2"
   },
   "devDependencies": {
     "dotenv": "^10.0.0",

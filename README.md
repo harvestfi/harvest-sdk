@@ -1,5 +1,41 @@
 # Harvest SDK
 
+# Installation
+
+    npm install --save harvest-sdk@0.0.1
+
+# Usage
+
+## Typical flow
+
+    [list tokens] -> get token
+    [use token] -> [deposit into vault] -> get vault (of which you now have a balance)
+    [use vault] -> [stake in pool] -> get pool (of which you now have a balance)
+
+
+## List all of my available tokens that I could deposit and stake
+
+    // initialise the harvest SDK
+    const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
+    const harvest = new HarvestSDK({signerOrProvider: wallet});
+    
+    (await harvest.myTokens()).foreach(token => {
+        console.log(token.name, await token.balanceOf(await wallet.getAddress()));    
+    });
+
+## Deposit and stake all of a token
+
+    // initialise the harvest SDK
+    const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
+    const harvest = new HarvestSDK({signerOrProvider: wallet, chain: Chain});
+    
+    // find the crvtricrypto vault
+    const crvTriCryptoVault = (await harvest.vaults()).findVaultByName("crvtricrypto"); // search is case insensitive
+    
+    // deposit and stake ALL your crvTricrypto LP (liquidity pool) tokens.
+    await harvest.depositAndStake(crvTriCryptoVault, await crvTriCryptoVault.balanceOf(await wallet.getAddress()));
+
+
 # Testing
 
 You can run tests by using this command:
@@ -7,7 +43,7 @@ You can run tests by using this command:
     npx hardhat test
 
 It's worth stating that you MUST have the following lines at the top of mocha tests in order to force the loading of ethers to be overwritten by the hardhat environment
-BEFORE ethers is loaded via the harvestsdk class. Thus allowing testing.
+BEFORE ethers is loaded via the HarvestSDK class. Thus allowing testing.
 Put this at the top of your tests cases:
 
     import * as dotenv from 'dotenv';
@@ -15,27 +51,6 @@ Put this at the top of your tests cases:
     const ethers = hre.ethers;
     
 
-# Usage
-
-## List all of my available tokens that I could deposit and stake
-
-    // initialise the harvest SDK
-    const harvest = new HarvestSDK(ethers.defaultProvider());
-    
-    (await harvest.myVaults()).foreach(vault => {
-        console.log(vault.name, await vault.balanceOf(<MY ADDR>));    
-    });
-
-## Deposit and stake all of a token
-
-    // initialise the harvest SDK
-    const harvest = new HarvestSDK(ethers.defaultProvider());
-    
-    // find the crvtricrypto vault
-    const crvTriCryptoVault = (await harvest.vaults()).findVaultByName("crvtricrypto"); // search is case insensitive
-    
-    // deposit and stake ALL your crvTricrypto LP (liquidity pool) tokens.
-    await harvest.depositAndStake(crvTriCryptoVault);
 
 
 # Intro

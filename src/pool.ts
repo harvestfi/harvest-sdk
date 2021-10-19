@@ -3,7 +3,7 @@
  * Pools implement the erc20 interface, and thus all the usual methods
  * apply
  */
-import {BigNumber, ContractReceipt, ethers} from "ethers";
+import {BigNumber, Contract, ContractReceipt, ethers} from "ethers";
 import {Chain} from "./chain";
 import poolAbi from './abis/pool.json';
 import {Vault} from "./vault";
@@ -14,6 +14,7 @@ export class Pool {
      * The contract address on the chain on which this token lives
      */
     private signerOrProvider: ethers.Signer| ethers.providers.Provider;
+    private contract: Contract;
     readonly address: string;
     readonly chainId: Chain;
     readonly collateralAddress: string;
@@ -22,6 +23,7 @@ export class Pool {
 
     constructor(signerOrProvider: ethers.Signer| ethers.providers.Provider, chainId: Chain, address: string, collateralAddress: string, name: string, rewards: string[]) {
         this.signerOrProvider = signerOrProvider;
+        this.contract = new ethers.Contract(address, poolAbi, this.signerOrProvider);
         this.address = address;
         this.chainId = chainId;
         this.collateralAddress = collateralAddress;
@@ -29,9 +31,12 @@ export class Pool {
         this.rewards = rewards;
     }
 
-    balanceOf(address: string): Promise<BigNumber> {
-        const contr = new ethers.Contract(this.address, poolAbi, this.signerOrProvider);
-        return contr.balanceOf(address);
+    async balanceOf(address: string): Promise<BigNumber> {
+        try {
+            return await this.contract.balanceOf(address);
+        } catch (e) {
+            return BigNumber.from(0);
+        }
     }
 
     async claimRewards(): Promise<ContractReceipt> {
@@ -54,6 +59,6 @@ export class Pools {
             return pool.collateralAddress === vault.address;
         });
         if(pools.length) return pools[0];
-        else throw new Error(`Could not find an associated pool using vault ${vault.name}`);
+        else throw new Error(`Could not find an associated pool using vault ${vault.symbol}`);
     }
 }
