@@ -20,5 +20,9 @@ jobs:
           ls ${{ github.workspace }}
       - run: echo "🍏 This job's status is ${{ job.status }}."
       - run: npm install
-      - run: npx hardhat test
+      - name: hardhat test
+        env:
+          - INFURA_ETH_API_KEY: ${{ secrets.INFURA_ETH_API_KEY }}
+          - ETH_PINNED_BLOCK: 13433444
+        run: npx hardhat test
 

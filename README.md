@@ -6,13 +6,6 @@
 
 # Usage
 
-## Typical flow
-
-    [list tokens] -> get token
-    [use token] -> [deposit into vault] -> get vault (of which you now have a balance)
-    [use vault] -> [stake in pool] -> get pool (of which you now have a balance)
-
-
 ## List all of my available tokens that I could deposit and stake
 
     // initialise the harvest SDK
@@ -27,7 +20,7 @@
 
     // initialise the harvest SDK
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
-    const harvest = new HarvestSDK({signerOrProvider: wallet, chain: Chain});
+    const harvest = new HarvestSDK({signerOrProvider: wallet, chain: Chain.ETH});
     
     // find the crvtricrypto vault
     const crvTriCryptoVault = (await harvest.vaults()).findVaultByName("crvtricrypto"); // search is case insensitive
