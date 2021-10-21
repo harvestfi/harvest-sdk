@@ -30,8 +30,7 @@ jobs:
       - name: Package for NPM
         run: npm run package
       - name: Publish to NPM
-        uses: JS-DevTools/npm-publish@v1
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
-
+        run: |
+          npm config set ::add-mask:://registry.npmjs.org/:_authToken=${{ secrets.NPM_AUTH_TOKEN }}
+          npm publish dist --access public
 
