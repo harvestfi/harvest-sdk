@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v2
         with:
-          node-version: '14'
+          node-version: '12'
       - name: Check out repository code
         uses: actions/checkout@v2
       - run: npm install
@@ -19,14 +19,17 @@ jobs:
           ALCHEMY_ETH_API_KEY: ${{ secrets.ALCHEMY_ETH_API_KEY }}
           ETH_PINNED_BLOCK: 13433444
         run: npx hardhat test
-
-  deploy:
-    name: Publish to NPM
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: build-and-test
-    steps:
+#
+#  deploy:
+#    name: Publish to NPM
+#    if: github.ref == 'refs/heads/main'
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 10
+#    needs: build-and-test
+#    steps:
+#      - uses: actions/setup-node@v2
+#        with:
+#          node-version: '12'
       - name: Package for NPM
         run: npm run package
       - name: Publish to NPM
