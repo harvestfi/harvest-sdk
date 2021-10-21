@@ -22,10 +22,10 @@ jobs:
 
   deploy:
     name: Publish to NPM
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: build-and-test
     steps:
       - name: Package for NPM
         run: npm run package

@@ -5,7 +5,6 @@ import {HarvestSDK} from "../src/harvest";
 import {Chain} from "../src/chain";
 import {BigNumber} from "ethers";
 import wethAbi from '../src/abis/weth.json';
-import vaultAbi from '../src/abis/vault.json';
 import {
     InsufficientApprovalError,
     InsufficientBalanceError, InsufficientPoolBalanceError,
