@@ -7,6 +7,7 @@ import {BigNumber, Contract, ContractReceipt, ethers} from "ethers";
 import {Chain} from "./chain";
 import poolAbi from './abis/pool.json';
 import {Vault} from "./vault";
+import {Token} from "./token";
 
 export class Pool {
 
@@ -14,7 +15,7 @@ export class Pool {
      * The contract address on the chain on which this token lives
      */
     private signerOrProvider: ethers.Signer| ethers.providers.Provider;
-    private contract: Contract;
+    readonly contract: Contract;
     readonly address: string;
     readonly chainId: Chain;
     readonly collateralAddress: string;
@@ -39,9 +40,21 @@ export class Pool {
         }
     }
 
-    async claimRewards(): Promise<ContractReceipt> {
-        const contr = new ethers.Contract(this.address, poolAbi, this.signerOrProvider);
-        const tx = await contr.getAllRewards();
+    async claimRewards(): Promise<Token> {
+        const tx = await this.contract.getReward();
+        await tx.wait();
+        // figure out the rewards tokens
+        const rewardAddress = this.contract.rewardToken();
+        return new Token(this.signerOrProvider, this.chainId, rewardAddress, 18);
+    }
+
+    async withdraw(amountInWei: BigNumber) {
+        const tx = await this.contract.withdraw(amountInWei);
+        return await tx.wait();
+    }
+
+    async stake(amountInWei: BigNumber) {
+        const tx = await this.contract.stake(amountInWei);
         return await tx.wait();
     }
 }
@@ -60,5 +73,13 @@ export class Pools {
         });
         if(pools.length) return pools[0];
         else throw new Error(`Could not find an associated pool using vault ${vault.symbol}`);
+    }
+
+    findByName(name: string): Pool {
+        const pools = this.pools.filter(pool => {
+            return pool.name === name;
+        });
+        if(pools.length) return pools[0];
+        else throw new Error(`Could not find an associated pool using name ${name}`);
     }
 }

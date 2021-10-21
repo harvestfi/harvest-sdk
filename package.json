@@ -4,8 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "package": "zip -r package.zip node_modules && zip -ur package.zip src/* && zip -u package.zip networks.config.js",
-    "test": "mocha -r ts-node/register test/**/*.spec.ts"
+    "clean": "rm -rf dist",
+    "compile": "tsc --build",
+    "pre-package": "npm run clean && npm run compile",
+    "package": "npm run pre-package && cp package*.json README.md dist",
+    "test": "mocha -r ts-node/register --timeout 40000 test/**/*.spec.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,15 +16,17 @@
   "dependencies": {
     "@types/node-fetch": "2.5.12",
     "ethers": "^5.4.1",
-    "node-fetch": "^2.6.2",
-    "npx": "^10.2.2"
+    "typechain": "^5.2.0",
+    "node-fetch": "^2.6.2"
   },
   "devDependencies": {
+    "npx": "^10.2.2",
     "dotenv": "^10.0.0",
     "ts-node": "^10.2.1",
     "typescript": "^4.4.3",
     "tsconfig-paths": "^3.11.0",
-    "@typechain/hardhat": "^2.3.0",
+    "ethereum-waffle": "^3.4.0",
+    "@typechain/hardhat": "^2.3.1",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.4",
     "@nomiclabs/hardhat-truffle5": "^2.0.0",
@@ -36,6 +41,7 @@
     "mocha": "^9.1.1",
     "chai": "^4.3.4",
     "hardhat": "^2.6.0",
+    "@codechecks/client": "^0.1.12",
     "hardhat-gas-reporter": "1.0.4",
     "nyc": "^15.1.0",
     "y18n": "^5.0.8"

@@ -62,13 +62,18 @@ export class HarvestSDK {
     /**
      * Deposit an amount into a vault, requires you to own the amount
      * of the asset you're interested in depositing.
-     * @param vault
-     * @param amount
+     * @param vault Vault
+     * @param amount BigNumber
      */
     async deposit(vault: Vault, amount: BigNumber) {
-        if(await this.checkAtLeast(vault.underlyingToken().contract, await (this.signerOrProvider as Signer).getAddress(), vault.address, amount)){
-            return await vault.deposit(amount);
-        } else throw new InsufficientApprovalError("Insufficient amount approved");
+        const address = await (this.signerOrProvider as Signer).getAddress();
+        if(!(await this.checkBalance(vault.underlyingToken().contract, address, amount))) {
+            throw new InvalidAmountError(amount);
+        }
+        if(!(await this.checkAtLeast(vault.underlyingToken().contract, address, vault.address, amount))) {
+            throw new InsufficientApprovalError("Insufficient amount approved");
+        }
+        return await vault.deposit(amount);
     }
 
     /**
@@ -82,7 +87,7 @@ export class HarvestSDK {
         // check balance
         // fail if asking for more than the balance available
         if (!await this.checkBalance(contract, await (this.signerOrProvider as Signer).getAddress(), amount)) {
-            throw new InvalidAmountError();
+            throw new InvalidAmountError(amount);
         }
         const tx = await contract.withdraw(amount);
         return await tx.wait();
@@ -194,33 +199,33 @@ export class HarvestSDK {
     }
 
     /**
-     * Allow the user to stake a fToken amount into the pool, the pool contains
+     * Allow the user to stake a fToken (vault) amount into the pool, the pool contains
      * the expected
      * @param pool
-     * @param amountInGwei
+     * @param amountInWei
      * @param signer
      */
-    async stake(pool: Pool, amountInGwei: BigNumber) {
-        // check that the user has the appropriate balance of collateral before allowing them to
-        if (await this.checkBalance(new ethers.Contract(pool.collateralAddress, vaultAbi, this.signerOrProvider), await (this.signerOrProvider as Signer).getAddress(), amountInGwei)) {
-            const poolContract = new ethers.Contract(pool.address, poolAbi, this.signerOrProvider);
-            const tx = await poolContract.stake(amountInGwei);
-            return await tx.wait();
-        } else throw new InsufficientVaultBalanceError(`You don't hold enough balance in the vault ${pool.collateralAddress}`);
+    async stake(pool: Pool, amountInWei: BigNumber) {
+        // check that the user has the appropriate balance of collateral before allowing them to stake
+        const vaults = await this.vaults();
+        const vault = vaults.findByPool(pool);
+        if (await this.checkBalance(vault.contract, await (this.signerOrProvider as Signer).getAddress(), amountInWei)) {
+            return await pool.stake(amountInWei);
+        } else throw new InsufficientVaultBalanceError(`You don't hold enough balance in the vault ${vault.symbol} [${vault.address}]`);
     }
 
     /**
      * Allow the user the ability to unstake an amount from the pool.
      * @param pool Pool
-     * @param amountInGwei BigNumber
+     * @param amountInWei BigNumber
      * @param signer Signer
      */
-    async unstake(pool: Pool, amountInGwei: BigNumber) {
-        // check that the user has the appropriate balance of collateral before allowing them to
-        const poolContract = new ethers.Contract(pool.address, poolAbi, this.signerOrProvider);
-        if (await this.checkBalance(poolContract, await (this.signerOrProvider as Signer).getAddress(), amountInGwei)) {
-            const tx = await poolContract.withdraw(amountInGwei);
-            return await tx.wait();
+    async unstake(pool: Pool, amountInWei: BigNumber): Promise<Vault> {
+        // check that the user has the appropriate balance of collateral before allowing them to unstake
+        if (await this.checkBalance(pool.contract, await (this.signerOrProvider as Signer).getAddress(), amountInWei)) {
+            await pool.withdraw(amountInWei);
+            const vaults = await this.vaults();
+            return vaults.findByPool(pool);
         } else throw new InsufficientPoolBalanceError(`You don't hold enough balance in the pool ${pool.address}`);
     }
 
@@ -270,7 +275,7 @@ export class HarvestSDK {
      */
     private async checkBalance(contract: ethers.Contract, address: string, amount: BigNumber): Promise<boolean> {
         const balance = await contract.balanceOf(address);
-        return balance.gte(amount);
+        return balance.gte(amount) && amount.gt(0);
     }
 
     /**
@@ -280,9 +285,9 @@ export class HarvestSDK {
      * @param spender
      * @param amount
      */
-    private async checkAtLeast(contract: ethers.Contract, owner: string, spender: string, amount: BigNumber) {
+    private async checkAtLeast(contract: ethers.Contract, owner: string, spender: string, amount: BigNumber): Promise<boolean> {
         const allowance = await contract.allowance(owner, spender);
-        return allowance.gte(amount);
+        return allowance.gte(amount) && amount.gt(0);
     }
 
 }

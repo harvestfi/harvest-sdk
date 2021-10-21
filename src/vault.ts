@@ -15,7 +15,7 @@ export class Vault {
      * The contract address on the chain on which this token lives
      */
     private signerOrProvider: ethers.Signer | ethers.providers.Provider;
-    private contract: ethers.Contract;
+    readonly contract: ethers.Contract;
     readonly address: string;
     readonly chainId: Chain;
     readonly decimals: number;
