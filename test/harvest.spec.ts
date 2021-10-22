@@ -63,7 +63,7 @@ describe('Harvest SDK', async () => {
             expect(usdcByAddress?.symbol).to.be.eq("USDC");
             expect(usdcByAddress?.address).to.be.eq("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 
-        }).timeout(20000);
+        });
     });
 
     describe("vaults", async () => {
@@ -77,7 +77,7 @@ describe('Harvest SDK', async () => {
             expect(maybeVault).to.not.be.eq(undefined);
             expect(maybeVault?.address).to.be.eq(farm_crvTricypto);
             expect(maybeVault.tokens[0]).to.be.eq(crvTricrypto);
-        }).timeout(20000);
+        });
 
     });
 
@@ -88,7 +88,7 @@ describe('Harvest SDK', async () => {
                 const myPools = await harvest.myPools();
                 expect(myPools.length).to.be.gt(0);
             });
-        }).timeout(40000);
+        });
     });
 
     describe("balance checks", async () => {
@@ -298,7 +298,7 @@ describe('Harvest SDK', async () => {
                 expect(walletBalance.eq(expectedReturn)).to.be.eq(true);
             });
 
-        }).timeout(20000);
+        });
 
         it("should complain if i ask for a larger balance to withdraw", async () => {
             await withImpersonation(addr)(async (signer) => {
@@ -318,7 +318,7 @@ describe('Harvest SDK', async () => {
                     expect(e).to.be.instanceOf(InvalidAmountError);
                 }
             });
-        }).timeout(20000);
+        });
     });
 
     describe("staking", () => {
@@ -356,7 +356,7 @@ describe('Harvest SDK', async () => {
                 expect((await crvTricryptoPool.balanceOf(addr)).eq(BigNumber.from(0)));
 
             });
-        }).timeout(20000);
+        });
 
         it("should NOT allow me to stake more vault tokens than I own", async () => {
             await withImpersonation(addr)(async (signer) => {
@@ -380,7 +380,7 @@ describe('Harvest SDK', async () => {
                 }
 
             });
-        }).timeout(20000);
+        });
 
     });
 
@@ -413,7 +413,7 @@ describe('Harvest SDK', async () => {
                 expect((await crvTriCryptoPool.balanceOf(address)).gt(0)).to.be.eq(true);
 
             });
-        }).timeout(20000);
+        });
 
         it("should allow me to unstake and withdraw in 1 step", async() => {
             await withImpersonation(addr)(async (signer) => {
@@ -428,7 +428,7 @@ describe('Harvest SDK', async () => {
                 const token = await harvest.unstakeAndWithdraw(sushiEthPool, await sushiEthPool.balanceOf(address));
                 expect((await token.balanceOf(address)).gt(0));
             });
-        }).timeout(20000);
+        });
 
 
         it("should complain if i unstake a zero balance", async() => {
@@ -446,7 +446,7 @@ describe('Harvest SDK', async () => {
                     expect(e).to.be.instanceOf(InsufficientPoolBalanceError);
                 }
             });
-        }).timeout(20000);
+        });
 
     });
 
@@ -475,7 +475,7 @@ describe('Harvest SDK', async () => {
                 expect(newiFarmBalance.gt(currentiFarmBalance)).to.be.eq(true);
                 expect(newFarmBalance.gt(currentFarmBalance)).to.be.eq(true);
             });
-        }).timeout(20000);
+        });
     });
 
 
@@ -530,7 +530,7 @@ describe('Harvest SDK', async () => {
 
             expect(res).to.deep.eq(expectedFixture);
         });
-    }).timeout(40000);
+    });
 
 });
 
