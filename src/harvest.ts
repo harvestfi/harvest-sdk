@@ -103,6 +103,7 @@ export class HarvestSDK {
             const theFilter = chainFilter(await this.getChainId());
             return await fetch(this.harvestTokensEndpoint).then(_ => _.json()).then(_ => _.data).then((tokens: any) => {
                 this._tokens = new Tokens(Object.keys(tokens)
+                    .filter(symbol => !Array.isArray(tokens[symbol].tokenAddress))
                     .filter((symbol) => theFilter(tokens[symbol]))
                     .map((symbol) => {
                         return new Token(this.signerOrProvider, parseInt(tokens[symbol].chain), tokens[symbol].tokenAddress, tokens[symbol].decimals, symbol);
@@ -157,7 +158,8 @@ export class HarvestSDK {
     }
 
     /**
-     * Fetch all tokens where the address holds a positive balance
+     * Fetch all tokens where the address holds a positive balance and are
+     * potential candidates for depositing into pools
      * @param address string
      * @return Promise<{ balance: BigNumber; pool: Pool }[]>
      */
@@ -289,5 +291,7 @@ export class HarvestSDK {
         const allowance = await contract.allowance(owner, spender);
         return allowance.gte(amount) && amount.gt(0);
     }
+
+
 
 }

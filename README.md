@@ -6,14 +6,26 @@
 
 # Usage
 
-## List all of my available tokens that I could deposit and stake
+## List all of my available tokens that I could deposit
 
     // initialise the harvest SDK
+    import {HarvestSDK} from "harvest-sdk";
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     const harvest = new HarvestSDK({signerOrProvider: wallet});
-    
-    (await harvest.myTokens()).foreach(token => {
-        console.log(token.name, await token.balanceOf(await wallet.getAddress()));    
+    const tokens = await harvest.myTokens(); // expect the sample wallet to contain "some" depositable tokens
+    tokens.forEach(({balance, token}) => {
+        console.log(`${token.symbol}: ${balance}`);
+    });
+
+## List all of my vaults i've deposited into
+
+    // initialise the harvest SDK
+    import {HarvestSDK} from "harvest-sdk";
+    const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
+    const harvest = new HarvestSDK({signerOrProvider: wallet});
+    const vaults = await harvest.myVaults();
+    vaults.forEach(({vault, balance}) => {
+        console.log(`${vault.symbol}: ${balance}`);
     });
 
 ## Deposit and stake all of a token

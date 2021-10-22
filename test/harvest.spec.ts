@@ -41,15 +41,16 @@ describe('Harvest SDK', async () => {
             ],
         });
         // pre-fund the address balance
-        const [signer] = await ethers.getSigners();
-        const tx = await signer.sendTransaction({to: addr, value: ethers.utils.parseEther("1.0")});
+        const [hardhatSigner] = (await ethers.getSigners());
+        const tx = await hardhatSigner.sendTransaction({to: addr, value: ethers.utils.parseEther("1.0")});
         return await tx.wait();
     });
 
     describe("tokens", async () => {
-        it('should allow me to gets tokens by name', async () => {
 
-            const harvest = new  HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+        it('should allow me to gets tokens by name', async () => {
+            const [hardhatSigner] = (await ethers.getSigners());
+            const harvest = new  HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
             const tokens = await harvest.tokens();
 
             const usdcByName = tokens.findTokenBySymbol("USDC");
@@ -62,6 +63,14 @@ describe('Harvest SDK', async () => {
             expect(usdcByName?.address).to.be.eq("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
             expect(usdcByAddress?.symbol).to.be.eq("USDC");
             expect(usdcByAddress?.address).to.be.eq("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+
+        });
+
+        it("should allow me to list all my candidate tokens that can be deposited", async() => {
+            const [hardhatSigner] = (await ethers.getSigners());
+            const harvest = new  HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
+            const tokens = await harvest.myTokens(addr); // expect the sample wallet to contain "some" depositable tokens
+            expect(tokens.length).to.be.gt(0);
 
         });
     });
@@ -491,7 +500,6 @@ describe('Harvest SDK', async () => {
             const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const myVaults = await harvest.myVaults();
             const res = myVaults.reduce((acc: { [key: string]: string }, {vault, balance}) => {
-                // console.log(`${vault.name} : ${ethers.utils.formatUnits(balance, vault.decimals)}`);
                 const name = vault.symbol || "";
                 acc[name] = ethers.utils.formatUnits(balance, vault.decimals);
                 return acc;

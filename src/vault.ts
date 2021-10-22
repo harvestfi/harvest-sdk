@@ -50,6 +50,12 @@ export class Vault {
         return await tx.wait();
     }
 
+    /**
+     * Get the full price per full share.
+     * If you combine this with the balanceOf, i.e. pricePerFullShare*balance
+     * you will get the resultant amount of token to be returned in the
+     * event of a withdrawal.
+     */
     async getPricePerFullShare(): Promise<BigNumber> {
         return await this.contract.getPricePerFullShare();
     }
