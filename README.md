@@ -2,7 +2,7 @@
 
 # Installation
 
-    npm install --save harvest-sdk@0.0.1
+    npm install --save @harvestfi/harvest-sdk@0.0.1
 
 # Usage
 
@@ -12,7 +12,7 @@
     import {HarvestSDK} from "harvest-sdk";
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     const harvest = new HarvestSDK({signerOrProvider: wallet});
-    const tokens = await harvest.myTokens(); // expect the sample wallet to contain "some" depositable tokens
+    const tokens = await harvest.myTokens();
     tokens.forEach(({balance, token}) => {
         console.log(`${token.symbol}: ${balance}`);
     });
@@ -27,18 +27,39 @@
     vaults.forEach(({vault, balance}) => {
         console.log(`${vault.symbol}: ${balance}`);
     });
+    
+## List all of my pools i've staked in
+
+    import {HarvestSDK} from "harvest-sdk";
+    const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
+    
+    const harvest = new HarvestSDK({signerOrProvider: wallet});
+    
+    const myPools = harvest.myPools();
+    
+    (await myPools).forEach(({pool, balance}) => {
+        console.log(`${pool.name} ${ethers.utils.formatUnits(balance, 18)}`);
+    });
 
 ## Deposit and stake all of a token
 
     // initialise the harvest SDK
+    import {HarvestSDK} from "harvest-sdk";
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
-    const harvest = new HarvestSDK({signerOrProvider: wallet, chain: Chain.ETH});
+    const harvest = new HarvestSDK({signerOrProvider: wallet});
     
-    // find the crvtricrypto vault
-    const crvTriCryptoVault = (await harvest.vaults()).findVaultByName("crvtricrypto"); // search is case insensitive
-    
-    // deposit and stake ALL your crvTricrypto LP (liquidity pool) tokens.
-    await harvest.depositAndStake(crvTriCryptoVault, await crvTriCryptoVault.balanceOf(await wallet.getAddress()));
+    // convert 1 eth to weth
+    const weth = new ethers.Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', wethAbi, signer);
+    await weth.deposit({value: ethers.utils.parseEther("1")});
+
+    // find the weth vault
+    const wethVault = (await harvest.vaults()).findByName("WETH"); // search is case insensitive
+
+    // deposit and stake ALL YOUR WETH
+    const pool = await harvest.depositAndStake(wethVault, await wethVault.underlyingToken().balanceOf(await wallet.getAddress()));
+
+    console.log(`You are now in the WETH pool with a staked balance of : ${(await pool.balanceOf(await signer.getAddress())).toString()}`);
+
 
 
 # Testing
@@ -46,57 +67,3 @@
 You can run tests by using this command:
 
     npx hardhat test
-
-It's worth stating that you MUST have the following lines at the top of mocha tests in order to force the loading of ethers to be overwritten by the hardhat environment
-BEFORE ethers is loaded via the HarvestSDK class. Thus allowing testing.
-Put this at the top of your tests cases:
-
-    import * as dotenv from 'dotenv';
-    const hre = require("hardhat");
-    const ethers = hre.ethers;
-    
-
-
-
-# Intro
-
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
-
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
-
-Try running some of the following tasks:
-
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
-npx hardhat run scripts/deploy.js
-node scripts/deploy.js
-npx eslint '**/*.js'
-npx eslint '**/*.js' --fix
-npx prettier '**/*.{json,sol,md}' --check
-npx prettier '**/*.{json,sol,md}' --write
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
-```
-
-# Etherscan verification
-
-To try out Etherscan verification, you first need to deploy a contract to an Ethereum network that's supported by Etherscan, such as Ropsten.
-
-In this project, copy the .env.template file to a file named .env, and then edit it to fill in the details. Enter your Etherscan API key, your Ropsten node URL (eg from Alchemy), and the private key of the account which will send the deployment transaction. With a valid .env file in place, first deploy your contract:
-
-```shell
-hardhat run --network ropsten scripts/deploy.js
-```
-
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
-
-```shell
-npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
-```
