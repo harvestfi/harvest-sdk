@@ -9,7 +9,7 @@
 ## List all of my available tokens that I could deposit
 
     // initialise the harvest SDK
-    import {HarvestSDK} from "harvest-sdk";
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     const harvest = new HarvestSDK({signerOrProvider: wallet});
     const tokens = await harvest.myTokens();
@@ -20,7 +20,7 @@
 ## List all of my vaults i've deposited into
 
     // initialise the harvest SDK
-    import {HarvestSDK} from "harvest-sdk";
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     const harvest = new HarvestSDK({signerOrProvider: wallet});
     const vaults = await harvest.myVaults();
@@ -30,7 +30,7 @@
     
 ## List all of my pools i've staked in
 
-    import {HarvestSDK} from "harvest-sdk";
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     
     const harvest = new HarvestSDK({signerOrProvider: wallet});
@@ -44,7 +44,7 @@
 ## Deposit and stake all of a token
 
     // initialise the harvest SDK
-    import {HarvestSDK} from "harvest-sdk";
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
     const wallet = new ethers.Wallet('<PRIVATE KEY HERE>');
     const harvest = new HarvestSDK({signerOrProvider: wallet});
     
