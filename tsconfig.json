@@ -6,7 +6,11 @@
     "esModuleInterop": true,
     "moduleResolution": "node",
     "outDir": "dist",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "declaration": true,
+    // This compiler run should
+    // only output d.ts files
+    "emitDeclarationOnly": true
   },
   "include": ["./src"]
 }
