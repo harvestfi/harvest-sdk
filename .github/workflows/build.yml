@@ -24,7 +24,7 @@ jobs:
       - name: Package for NPM
         run: npm run package
       - name: Publish to NPM
-        run: npm publish dist --access public --verbose
+        run: npm publish dist --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
