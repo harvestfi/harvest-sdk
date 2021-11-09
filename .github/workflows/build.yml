@@ -16,17 +16,15 @@ jobs:
           node-version: '12'
           registry-url: 'https://registry.npmjs.org'
       - run: npm install
-      - name: Run Hardhat Tests
-        env:
-          ALCHEMY_ETH_API_KEY: ${{ secrets.ALCHEMY_ETH_API_KEY }}
-          ETH_PINNED_BLOCK: 13433444
-        run: npx hardhat test
+#      - name: Run Hardhat Tests
+#        env:
+#          ALCHEMY_ETH_API_KEY: ${{ secrets.ALCHEMY_ETH_API_KEY }}
+#          ETH_PINNED_BLOCK: 13433444
+#        run: npx hardhat test
       - name: Package for NPM
         run: npm run package
-      - name: NPM login
-        run: npm login
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
       - name: Publish to NPM
         run: npm publish dist --access public --verbose
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
