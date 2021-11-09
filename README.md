@@ -60,7 +60,30 @@
 
     console.log(`You are now in the WETH pool with a staked balance of : ${(await pool.balanceOf(await signer.getAddress())).toString()}`);
 
+# Anonymous Usage
 
+You don't always need to use a provider to get some information out of the sdk.
+
+For example you can list all the available vaults:
+
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
+    const harvest = new  HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+    const vaultContainer = await harvest.vaults();
+
+    vaultContainer.vaults.forEach(vault => {
+        console.log(`${vault.symbol} ${vault.address}`);
+    })
+    
+    
+Additionally you can do the same for the pools:
+
+    const {HarvestSDK} = require("@harvestfi/harvest-sdk/harvest");
+    const harvest = new  HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+    const poolContainer = await harvest.pools();
+
+    poolContainer.pools.forEach(pool => {
+        console.log(`${pool.symbol} ${pool.address}`);
+    })
 
 # Testing
 
