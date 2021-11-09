@@ -15,28 +15,19 @@ jobs:
         with:
           node-version: '12'
           registry-url: 'https://registry.npmjs.org'
-          scope: '@harvestfi'
       - run: npm install
       - name: Run Hardhat Tests
         env:
           ALCHEMY_ETH_API_KEY: ${{ secrets.ALCHEMY_ETH_API_KEY }}
           ETH_PINNED_BLOCK: 13433444
         run: npx hardhat test
-#
-#  deploy:
-#    name: Publish to NPM
-#    if: github.ref == 'refs/heads/main'
-#    runs-on: ubuntu-latest
-#    timeout-minutes: 10
-#    needs: build-and-test
-#    steps:
-#      - uses: actions/setup-node@v2
-#        with:
-#          node-version: '12'
       - name: Package for NPM
         run: npm run package
       - name: Publish to NPM
-        run: npm publish dist --access public
+      - name: NPM login
+        run: npm login
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+      - name: NPM Publish
+        run: npm publish dist --access public --verbose
 
