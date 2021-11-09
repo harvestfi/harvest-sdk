@@ -45,5 +45,16 @@
     "hardhat-gas-reporter": "1.0.4",
     "nyc": "^15.1.0",
     "y18n": "^5.0.8"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harvestfi/harvest-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/harvestfi/harvest-sdk/issues"
+  },
+  "homepage": "https://github.com/harvestfi/harvest-sdk#readme"
 }
