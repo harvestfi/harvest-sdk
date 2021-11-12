@@ -3,28 +3,52 @@
  */
 import {Chain} from "./chain";
 import {BigNumber, Contract, ContractReceipt, ethers} from "ethers";
+import univ2Abi from './abis/univ2lp.json';
 import erc20Abi from './abis/erc20.json';
+
+export interface TokenConstructor {
+    signerOrProvider: ethers.Signer | ethers.providers.Provider,
+    chainId: Chain,
+    address: string,
+    decimals: number,
+    symbol?: string,
+    abi?: object[]
+}
+
+export interface IToken {
+    balanceOf(address: String): Promise<BigNumber>
+    approve(amount: BigNumber): Promise<ContractReceipt>
+}
 
 export class Token {
     /**
      * The contract address on the chain on which this token lives
      */
-    private signerOrProvider: ethers.Signer | ethers.providers.Provider;
+    protected signerOrProvider: ethers.Signer | ethers.providers.Provider;
     readonly contract: Contract;
     readonly address: string;
     readonly chainId: Chain;
     readonly decimals: number;
     readonly symbol?: string;
+    readonly abi?: object[];
 
-    constructor(signerOrProvider: ethers.Signer|ethers.providers.Provider, chainId: Chain, address: string, decimals: number, symbol?: string) {
+    constructor(tokenArgs: TokenConstructor) {
+        const {signerOrProvider, chainId, address, decimals, symbol, abi} = tokenArgs;
         this.signerOrProvider = signerOrProvider;
-        this.contract = new ethers.Contract(address, erc20Abi, signerOrProvider);
+        this.abi = abi || erc20Abi;
+        this.contract = new ethers.Contract(address, this.abi, signerOrProvider);
         this.address = address;
         this.chainId = chainId;
         this.decimals = decimals;
         this.symbol = symbol;
     }
 
+    /**
+     * Return the balanceOf the contract, handling errors
+     * where we cannot seem to find the balance of the contract
+     * this deciding it is 0 instead of failing.
+     * @param address
+     */
     async balanceOf(address: string): Promise<BigNumber> {
         try {
             return await this.contract.balanceOf(address);
@@ -48,12 +72,12 @@ export class Tokens {
     private byAddress = new Map<string, Token>();
     readonly tokens: Token[];
 
-    constructor(tokens: Token[]){
+    constructor(tokens: Token[]) {
         // todo this filters uniswap v3 due to the token having an array of addresses.
         this.tokens = tokens.filter(token => !Array.isArray(token.address));
         tokens.forEach(token => {
-            if(token.symbol) this.bySymbol.set(token.symbol.toLowerCase(), token);
-            if(!Array.isArray(token.address)) this.byAddress.set(token.address.toLowerCase(), token);
+            if (token.symbol) this.bySymbol.set(token.symbol.toLowerCase(), token);
+            if (!Array.isArray(token.address)) this.byAddress.set(token.address.toLowerCase(), token);
         })
     }
 

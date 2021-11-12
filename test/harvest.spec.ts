@@ -5,12 +5,17 @@ import {HarvestSDK} from "../src/harvest";
 import {Chain} from "../src/chain";
 import {BigNumber} from "ethers";
 import wethAbi from '../src/abis/weth.json';
+import erc20Abi from '../src/abis/erc20.json';
 import {
     InsufficientApprovalError,
-    InsufficientBalanceError, InsufficientPoolBalanceError,
+    InsufficientPoolBalanceError,
     InsufficientVaultBalanceError,
     InvalidAmountError
 } from "../src/errors";
+import {Pool} from "../src/pool";
+import {Vault} from "../src/vault";
+import {Networks} from "../src/networks";
+
 const networks = require('../networks.config');
 // switch the networks before including hardhat hre
 // networks.hardhat.forking = networks.polygon;
@@ -46,11 +51,43 @@ describe('Harvest SDK', async () => {
         return await tx.wait();
     });
 
+    describe("initialisation", async () => {
+
+        it("should allow me to be initialised purely by ChainId (ETH)", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.ETH});
+            const vaultsContainer = await harvest.vaults();
+            expect(vaultsContainer.vaults.length).to.be.gt(0);
+            vaultsContainer.vaults.forEach(vault => {
+                expect(vault.chainId).to.be.eq(Chain.ETH);
+            })
+
+        });
+
+        it("should allow me to be initialised purely by ChainId (BSC)", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.BSC});
+            const vaultsContainer = await harvest.vaults();
+            expect(vaultsContainer.vaults.length).to.be.gt(0);
+            vaultsContainer.vaults.forEach(vault => {
+                expect(vault.chainId).to.be.eq(Chain.BSC);
+            })
+
+        });
+
+        it("should allow me to be initialised purely by ChainId (POLYGON)", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.POLYGON});
+            const vaultsContainer = await harvest.vaults();
+            expect(vaultsContainer.vaults.length).to.be.gt(0);
+            vaultsContainer.vaults.forEach(vault => {
+                expect(vault.chainId).to.be.eq(Chain.POLYGON);
+            })
+        });
+    });
+
     describe("tokens", async () => {
 
         it('should allow me to gets tokens by name', async () => {
             const [hardhatSigner] = (await ethers.getSigners());
-            const harvest = new  HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
             const tokens = await harvest.tokens();
 
             const usdcByName = tokens.findTokenBySymbol("USDC");
@@ -66,9 +103,9 @@ describe('Harvest SDK', async () => {
 
         });
 
-        it("should allow me to list all my candidate tokens that can be deposited", async() => {
+        it("should allow me to list all my candidate tokens that can be deposited", async () => {
             const [hardhatSigner] = (await ethers.getSigners());
-            const harvest = new  HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: hardhatSigner, chainId: Chain.ETH}); // eth mainnet
             const tokens = await harvest.myTokens(addr); // expect the sample wallet to contain "some" depositable tokens
             expect(tokens.length).to.be.gt(0);
 
@@ -78,7 +115,7 @@ describe('Harvest SDK', async () => {
     describe("vaults", async () => {
 
         it('should allow me to gets vaults by name', async () => {
-            const harvest = new  HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
 
             const maybeVault = vaults.findByName("crvTricrypto");
@@ -88,12 +125,29 @@ describe('Harvest SDK', async () => {
             expect(maybeVault.tokens[0]).to.be.eq(crvTricrypto);
         });
 
+        it("should allow me to list all vaults", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+            const vaultContainer = await harvest.vaults();
+
+            expect(vaultContainer.vaults.length).to.be.gt(0);
+            expect(vaultContainer.vaults[0]).to.be.instanceOf(Vault);
+        });
+
     });
 
     describe("pools", async () => {
+
+        it("should allow me to list all pools", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.ETH});
+            const poolContainer = await harvest.pools();
+
+            expect(poolContainer.pools.length).to.be.gt(0);
+            expect(poolContainer.pools[0]).to.be.instanceOf(Pool);
+        });
+
         it("should allow me to list all my pool stakes", async () => {
             await withImpersonation(addr)(async (signer) => {
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const myPools = await harvest.myPools();
                 expect(myPools.length).to.be.gt(0);
             });
@@ -110,21 +164,21 @@ describe('Harvest SDK', async () => {
             const weth = new ethers.Contract(wethContractAddress, wethAbi, signer);
             await weth.deposit({value: ethers.utils.parseEther("1")});
 
-            const harvest = new HarvestSDK({signerOrProvider:signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
             const wethVault = vaults.findByName("WETH");
             const wethVaultBalanceBefore = await wethVault.balanceOf(await signer.getAddress());
 
             expect(wethVaultBalanceBefore.toNumber()).to.be.eq(0); // preliminary expectation that a new user has a zero balance in the weth vault
-
+            let failed = true;
             try {
                 await harvest.deposit(wethVault, BigNumber.from(1));
-                expect(true).to.be.eq(false, "The deposit should fail, not succeed.");
-            } catch(e){
+                failed = false;
+            } catch (e) {
                 expect(e).to.be.instanceOf(InsufficientApprovalError);
                 // hide the exception this is expected to fail
             }
-
+            expect(failed).to.be.eq(true, "The deposit should fail, not succeed.");
         });
 
         it("should complain when I attempt to deposit but have zero funds", async () => {
@@ -134,7 +188,7 @@ describe('Harvest SDK', async () => {
             const weth = new ethers.Contract(wethContractAddress, wethAbi, signer);
             await weth.deposit({value: ethers.utils.parseEther("1")});
 
-            const harvest = new HarvestSDK({signerOrProvider:signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
             const wethVault = vaults.findByName("WETH");
             // allow spending of 1 gwei
@@ -142,35 +196,33 @@ describe('Harvest SDK', async () => {
             // withdraw the weth before depositing, this basically causes a disparity in the ability to spend this weth into the vault.
             await weth.withdraw(ethers.utils.parseEther("1"));
 
+            let failed = true;
             try {
                 await harvest.deposit(wethVault, BigNumber.from(1));
-                expect(true).to.be.eq(false, "The deposit should fail, not succeed.");
-            } catch(e){
+                failed = false;
+            } catch (e) {
                 expect(e).to.be.instanceOf(InvalidAmountError);
                 // hide the exception this is expected to fail
             }
+            expect(failed).to.be.eq(true, "The deposit should fail, not succeed.");
         });
 
         it("should complain when I attempt to deposit zero", async () => {
             const [signer] = (await ethers.getSigners());
 
-            // swap eth for weth using the weth contract (pre-amble)
-            const weth = new ethers.Contract(wethContractAddress, wethAbi, signer);
-            await weth.deposit({value: ethers.utils.parseEther("1")});
-
-            const harvest = new HarvestSDK({signerOrProvider:signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
             const wethVault = vaults.findByName("WETH");
-            // allow spending of 1 wei
-            await harvest.approve(wethVault, BigNumber.from(1));
 
+            let failed = true;
             try {
                 await harvest.deposit(wethVault, BigNumber.from(0));
-                expect(true).to.be.eq(false, "The deposit should fail, not succeed.");
-            } catch(e){
+                failed = false;
+            } catch (e) {
                 expect(e).to.be.instanceOf(InvalidAmountError);
                 // hide the exception this is expected to fail
             }
+            expect(failed).to.be.eq(true, "The deposit should fail, not succeed.");
         });
 
     });
@@ -182,12 +234,12 @@ describe('Harvest SDK', async () => {
             const [signer] = (await ethers.getSigners());
             const signerAddress = await signer.getAddress();
 
-            const weth = new ethers.Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', wethAbi, signer);
+            const weth = new ethers.Contract(wethContractAddress, wethAbi, signer);
             // swap eth for weth using the weth contract (pre-amble)
             const amountInGwei = ethers.utils.parseEther("1");
             await weth.deposit({value: amountInGwei});
 
-            const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
 
             const wethVault = vaults.findByName("WETH");
@@ -209,7 +261,7 @@ describe('Harvest SDK', async () => {
             const amountInGwei = ethers.utils.parseEther("1");
             await weth.deposit({value: amountInGwei});
 
-            const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
 
             const wethVault = vaults.findByName("WETH");
@@ -235,7 +287,7 @@ describe('Harvest SDK', async () => {
             const amountInGwei = ethers.utils.parseEther("1");
             await weth.deposit({value: amountInGwei});
 
-            const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const vaults = await harvest.vaults();
 
             const wethVault = vaults.findByName("WETH");
@@ -257,7 +309,7 @@ describe('Harvest SDK', async () => {
 
         it("should allow me to deposit into lp token vault", async () => {
             await withImpersonation(addr)(async (signer) => {
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
 
                 const crvTriCryptoVault = vaults.findByName("crvtricrypto");
@@ -285,7 +337,7 @@ describe('Harvest SDK', async () => {
         it('should allow me to withdraw a valid balance', async () => {
             await withImpersonation(addr)(async (signer) => {
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
 
                 const crvTriCryptoVault = vaults.findByName("crvTricrypto");
@@ -312,7 +364,7 @@ describe('Harvest SDK', async () => {
         it("should complain if i ask for a larger balance to withdraw", async () => {
             await withImpersonation(addr)(async (signer) => {
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
 
                 const maybeVault = vaults.findByName("crvTricrypto");
@@ -335,7 +387,7 @@ describe('Harvest SDK', async () => {
         it("should allow me to stake and unstake a vault token", async () => {
             await withImpersonation(addr)(async (signer) => {
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
 
                 const maybeVault = vaults.findByName("crvTricrypto");
@@ -370,7 +422,7 @@ describe('Harvest SDK', async () => {
         it("should NOT allow me to stake more vault tokens than I own", async () => {
             await withImpersonation(addr)(async (signer) => {
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
 
                 const maybeVault = vaults.findByName("crvTricrypto");
@@ -384,7 +436,7 @@ describe('Harvest SDK', async () => {
                 try {
                     await harvest.stake(crvTricryptoPool, farmCrvTricryptoBalance.add(1));
                     expect(false).to.be.eq(true, "You should not be able to stake more than you own");
-                } catch(e){
+                } catch (e) {
                     expect(e).to.be.instanceOf(InsufficientVaultBalanceError)
                 }
 
@@ -395,11 +447,11 @@ describe('Harvest SDK', async () => {
 
     describe("1 step deposit/staking", async () => {
 
-        it("should allow me to deposit and stake in 1 step", async() => {
+        it("should allow me to deposit and stake in 1 step", async () => {
             await withImpersonation(addr)(async (signer) => {
                 const address = await signer.getAddress();
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const vaults = await harvest.vaults();
                 const pools = await harvest.pools();
                 const crvTriCryptoVault = vaults.findByName("crvTricrypto");
@@ -424,11 +476,11 @@ describe('Harvest SDK', async () => {
             });
         });
 
-        it("should allow me to unstake and withdraw in 1 step", async() => {
+        it("should allow me to unstake and withdraw in 1 step", async () => {
             await withImpersonation(addr)(async (signer) => {
 
                 const address = await signer.getAddress();
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const pools = await harvest.pools();
                 /**
                  * use pre-existing pool we should be in
@@ -440,11 +492,11 @@ describe('Harvest SDK', async () => {
         });
 
 
-        it("should complain if i unstake a zero balance", async() => {
+        it("should complain if i unstake a zero balance", async () => {
             await withImpersonation(addr)(async (signer) => {
 
                 const address = await signer.getAddress();
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const pools = await harvest.pools();
                 const sushiEthPool = pools.findByName("SUSHI-ETH-USDT");
                 expect((await sushiEthPool.balanceOf(address)).toNumber()).to.be.eq(0);
@@ -459,12 +511,38 @@ describe('Harvest SDK', async () => {
 
     });
 
-    describe("rewards", async() => {
+    describe("rewards", async () => {
+
+        it("should allow me to figure out what my current rewards are", async () => {
+            await withImpersonation(addr)(async (signer) => {
+
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const pools = await harvest.pools();
+                const sushiEthUSDTHODLPool = pools.findByName("SUSHI-ETH-USDT-HODL");
+
+                // non-address specific
+                const {amount} = await sushiEthUSDTHODLPool.earned();
+
+                expect(amount.gt(0)).to.be.eq(true);
+            });
+        });
+
+        it("should allow me to figure out what someone else's rewards are", async () => {
+            const [signer] = (await ethers.getSigners());
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+            const pools = await harvest.pools();
+            const sushiEthUSDTHODLPool = pools.findByName("SUSHI-ETH-USDT-HODL");
+
+            // address specific
+            const {amount} = await sushiEthUSDTHODLPool.earned(addr);
+
+            expect(amount.gt(0)).to.be.eq(true);
+        });
 
         it("should allow me to reap the rewards from a pool", async () => {
             await withImpersonation(addr)(async (signer) => {
 
-                const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
                 const pools = await harvest.pools();
                 const tokens = await harvest.tokens();
                 const maybeiFarm = tokens.findTokenBySymbol("iFARM");
@@ -497,7 +575,7 @@ describe('Harvest SDK', async () => {
     it("should allow me to list all my available vault deposits", async () => {
         await withImpersonation(addr)(async (signer) => {
 
-            const harvest = new  HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
             const myVaults = await harvest.myVaults();
             const res = myVaults.reduce((acc: { [key: string]: string }, {vault, balance}) => {
                 const name = vault.symbol || "";

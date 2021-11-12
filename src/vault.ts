@@ -62,10 +62,10 @@ export class Vault {
 
     /**
      * This only serves up the first token, in the case of erc721 uniswapv3 this will be wrong.
-     * @todo resolve issues around uniswapv3
+     * @todo resolve issues around uniswapv3, needs the correct ABI dependent on underlying
      */
     underlyingToken(): Token {
-        return new Token(this.signerOrProvider, this.chainId, this.tokens[0], this.decimals, this.symbol);
+        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0], decimals: this.decimals, symbol: this.symbol});
     }
 
 }

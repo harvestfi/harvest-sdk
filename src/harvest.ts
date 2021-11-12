@@ -1,20 +1,22 @@
 import {BigNumber, Contract, ContractReceipt, ethers, Signer} from "ethers";
 import fetch from "node-fetch";
 import {chainFilter} from "./filters";
-import {Tokens, Token} from "./token";
+import {Token, Tokens} from "./token";
 import {Chain} from "./chain";
 import {Vault, Vaults} from "./vault";
 import vaultAbi from './abis/vault.json'
-import poolAbi from './abis/pool.json'
+import erc20Abi from './abis/erc20.json'
 import {Pool, Pools} from "./pool";
 import {
-    Erc721Error, HarvestSDKArgsError,
+    Erc721Error,
+    HarvestSDKArgsError,
     InsufficientApprovalError,
     InsufficientBalanceError,
     InsufficientPoolBalanceError,
     InsufficientVaultBalanceError,
     InvalidAmountError
 } from "./errors";
+import {Networks} from "./networks";
 
 interface HarvestSDKArgs {
     signerOrProvider?: ethers.Signer | ethers.providers.Provider;
@@ -24,7 +26,7 @@ interface HarvestSDKArgs {
 export class HarvestSDK {
 
     private readonly signerOrProvider: ethers.Signer | ethers.providers.Provider;
-    private readonly chainId?:  Chain;
+    private readonly chainId?: Chain;
     private readonly harvestTokensEndpoint = "https://harvest.finance/data/tokens.json";
     private readonly harvestPoolsEndpoint = "https://harvest.finance/data/pools.json";
     private _vaults: Vaults | null = null;
@@ -33,8 +35,8 @@ export class HarvestSDK {
 
     constructor(harvestArgs: HarvestSDKArgs) {
         const {chainId, signerOrProvider} = harvestArgs;
-        if(!chainId && !signerOrProvider) throw new HarvestSDKArgsError("At least 1 of chainId or signerOrProvider is required. Ideally signerOrProvider");
-        this.signerOrProvider = signerOrProvider || ethers.getDefaultProvider();
+        if (!chainId && !signerOrProvider) throw new HarvestSDKArgsError("At least 1 of chainId or signerOrProvider is required. Ideally signerOrProvider");
+        this.signerOrProvider = signerOrProvider || ethers.getDefaultProvider(Networks.getNetwork(chainId));
         this.chainId = chainId;
     }
 
@@ -67,10 +69,10 @@ export class HarvestSDK {
      */
     async deposit(vault: Vault, amount: BigNumber) {
         const address = await (this.signerOrProvider as Signer).getAddress();
-        if(!(await this.checkBalance(vault.underlyingToken().contract, address, amount))) {
+        if (!(await this.checkBalance(vault.underlyingToken().contract, address, amount))) {
             throw new InvalidAmountError(amount);
         }
-        if(!(await this.checkAtLeast(vault.underlyingToken().contract, address, vault.address, amount))) {
+        if (!(await this.checkAtLeast(vault.underlyingToken().contract, address, vault.address, amount))) {
             throw new InsufficientApprovalError("Insufficient amount approved");
         }
         return await vault.deposit(amount);
@@ -80,7 +82,6 @@ export class HarvestSDK {
      * Withdraw amount from the vault
      * @param vault Vault
      * @param amount BigNumber
-     * @param signer ethers.Signer
      */
     async withdraw(vault: Vault, amount: BigNumber): Promise<ContractReceipt> {
         const contract = new ethers.Contract(vault.address, vaultAbi, this.signerOrProvider);
@@ -98,7 +99,7 @@ export class HarvestSDK {
      * @return Promise<Tokens>
      */
     async tokens(): Promise<Tokens> {
-        if(this._tokens) return this._tokens;
+        if (this._tokens) return this._tokens;
         else {
             const theFilter = chainFilter(await this.getChainId());
             return await fetch(this.harvestTokensEndpoint).then(_ => _.json()).then(_ => _.data).then((tokens: any) => {
@@ -106,7 +107,13 @@ export class HarvestSDK {
                     .filter(symbol => !Array.isArray(tokens[symbol].tokenAddress))
                     .filter((symbol) => theFilter(tokens[symbol]))
                     .map((symbol) => {
-                        return new Token(this.signerOrProvider, parseInt(tokens[symbol].chain), tokens[symbol].tokenAddress, tokens[symbol].decimals, symbol);
+                        return new Token({
+                            signerOrProvider: this.signerOrProvider,
+                            chainId: parseInt(tokens[symbol].chain),
+                            address: tokens[symbol].tokenAddress,
+                            decimals: tokens[symbol].decimals,
+                            symbol
+                        });
                     }));
                 return this._tokens;
             });
@@ -149,7 +156,14 @@ export class HarvestSDK {
                 this._pools = new Pools(Object.keys(pools)
                     .filter((name) => theFilter(pools[name]))
                     .map((name) => {
-                        return new Pool(this.signerOrProvider, parseInt(pools[name].chain), pools[name].contractAddress, pools[name].collateralAddress, pools[name].id, pools[name].rewardTokens);
+                        return new Pool({
+                            signerOrProvider: this.signerOrProvider,
+                            chainId: parseInt(pools[name].chain),
+                            address: pools[name].contractAddress,
+                            collateralAddress: pools[name].collateralAddress,
+                            name: pools[name].id,
+                            rewards: pools[name].rewardTokens
+                        });
                     })
                 );
                 return this._pools;
@@ -248,7 +262,8 @@ export class HarvestSDK {
         const balanceOfFToken = await vault.balanceOf(depositorAddress);
         const pool = await this.pools().then(_ => _.findByVault(vault));
         await vault.approve(pool.address, balanceOfFToken);
-        return await this.stake(pool, balanceOfFToken);
+        await this.stake(pool, balanceOfFToken);
+        return pool;
     }
 
     /**
@@ -259,10 +274,11 @@ export class HarvestSDK {
      */
     async unstakeAndWithdraw(pool: Pool, amount: BigNumber): Promise<Token> {
         const vault = await this.vaults().then(_ => _.findByPool(pool));
-        if(vault.tokens.length > 1) throw new Erc721Error();
+        if (vault.tokens.length > 1) throw new Erc721Error();
         await this.unstake(pool, amount);
+        await pool.claimRewards();
         const depositorAddress = await (this.signerOrProvider as Signer).getAddress();
-        // we withdraw the entire balance of the vault. this might not be entirely right.
+        // we withdraw the entire balance of the vault. @todo this might not be entirely right.
         const currentBalanceOfVault = await vault.balanceOf(depositorAddress);
         await this.withdraw(vault, currentBalanceOfVault);
         return vault.underlyingToken();

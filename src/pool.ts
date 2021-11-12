@@ -3,18 +3,33 @@
  * Pools implement the erc20 interface, and thus all the usual methods
  * apply
  */
-import {BigNumber, Contract, ContractReceipt, ethers} from "ethers";
+import {BigNumber, Contract, ContractReceipt, ethers, Signer} from "ethers";
 import {Chain} from "./chain";
 import poolAbi from './abis/pool.json';
+import erc20Abi from './abis/erc20.json';
 import {Vault} from "./vault";
 import {Token} from "./token";
+
+interface EarnedAmount {
+    token: Token,
+    amount: BigNumber
+}
+
+interface PoolConstructorArgs {
+    signerOrProvider: ethers.Signer | ethers.providers.Provider,
+    chainId: Chain,
+    address: string,
+    collateralAddress: string,
+    rewards: string[]
+    name?: string,
+}
 
 export class Pool {
 
     /**
      * The contract address on the chain on which this token lives
      */
-    private signerOrProvider: ethers.Signer| ethers.providers.Provider;
+    private readonly signerOrProvider: ethers.Signer| ethers.providers.Provider;
     readonly contract: Contract;
     readonly address: string;
     readonly chainId: Chain;
@@ -22,7 +37,8 @@ export class Pool {
     readonly name?: string;
     readonly rewards: string[];
 
-    constructor(signerOrProvider: ethers.Signer| ethers.providers.Provider, chainId: Chain, address: string, collateralAddress: string, name: string, rewards: string[]) {
+    constructor(args: PoolConstructorArgs) {
+        const {signerOrProvider, chainId, address, collateralAddress, name, rewards} = args;
         this.signerOrProvider = signerOrProvider;
         this.contract = new ethers.Contract(address, poolAbi, this.signerOrProvider);
         this.address = address;
@@ -40,19 +56,46 @@ export class Pool {
         }
     }
 
+    /**
+     * Claim rewards, most rewards are expected to be FARM or iFARM tokens.
+     * @return Promise<Token>
+     */
     async claimRewards(): Promise<Token> {
         const tx = await this.contract.getReward();
         await tx.wait();
         // figure out the rewards tokens
-        const rewardAddress = this.contract.rewardToken();
-        return new Token(this.signerOrProvider, this.chainId, rewardAddress, 18);
+        const rewardAddress = await this.contract.rewardToken();
+        const tokenContract = new Contract(rewardAddress, erc20Abi, this.signerOrProvider);
+        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: rewardAddress, decimals: await tokenContract.decimals()});
     }
 
+    /**
+     * Get the rewards token and amount of reward available to collect.
+     * @param address
+     * @return Promise<EarnedAmount>
+     */
+    async earned(address?: String): Promise<EarnedAmount> {
+        address = address || await (this.signerOrProvider as Signer).getAddress();
+        const rewardAddress = await this.contract.rewardToken();
+        const tokenContract = new Contract(rewardAddress, erc20Abi, this.signerOrProvider);
+        return {token: new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: rewardAddress, decimals: await tokenContract.decimals(), symbol: await tokenContract.symbol()}), amount: await this.contract['earned(address)'](address)};
+    }
+
+    /**
+     * Withdraw an amount (in wei) from the pool
+     * @param amountInWei
+     */
     async withdraw(amountInWei: BigNumber) {
         const tx = await this.contract.withdraw(amountInWei);
         return await tx.wait();
     }
 
+    /**
+     * Stake an amount (in wei) into the pool
+     * This expectation here is that there is a Vault LP position
+     * that has been approved to spend by the pool contract.
+     * @param amountInWei
+     */
     async stake(amountInWei: BigNumber) {
         const tx = await this.contract.stake(amountInWei);
         return await tx.wait();
