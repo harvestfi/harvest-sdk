@@ -24,6 +24,7 @@ jobs:
           ETH_PINNED_BLOCK: 13433444
   deploy:
     needs: build-and-test
+    runs-on: ubuntu-latest
     steps:
       - name: Package for NPM
         run: npm run package
