@@ -10,7 +10,7 @@ import {
     InsufficientApprovalError,
     InsufficientPoolBalanceError,
     InsufficientVaultBalanceError,
-    InvalidAmountError
+    InvalidAmountError, InvalidVaultNameError
 } from "../src/errors";
 import {Pool} from "../src/pool";
 import {Vault} from "../src/vault";
@@ -131,6 +131,22 @@ describe('Harvest SDK', async () => {
 
             expect(vaultContainer.vaults.length).to.be.gt(0);
             expect(vaultContainer.vaults[0]).to.be.instanceOf(Vault);
+        });
+        
+        it("should throw an error for an invalid vault", async () => {
+            const harvest = new HarvestSDK({chainId: Chain.ETH}); // eth mainnet
+            const vaults = await harvest.vaults();
+
+            let failed = true;
+            try {
+                const maybeVault = vaults.findByName("gibberish");
+                failed = false;
+            } catch (e) {
+                expect(e).to.be.instanceOf(InvalidVaultNameError);
+                // hide the exception this is expected to fail
+            }
+            expect(failed).to.be.eq(true, "The lookup should fail, not succeed.");
+
         });
 
     });
