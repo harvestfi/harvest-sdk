@@ -285,41 +285,6 @@ export class HarvestSDK {
     }
 
     /**
-     * Gives back a list of {token: Token,return: BigNumber} pairs
-     * to give an indication of what yield would be gained on exiting
-     * a pool.
-     * @param pool
-     */
-    async expectedReturns(pool: Pool): Promise<{token: Token, amount: BigNumber}[]> {
-        const depositorAddress = await (this.signerOrProvider as ethers.Signer).getAddress();
-        const {token: rewardToken, amount: rewardAmount} = await pool.earned(depositorAddress);
-        // for this pool we need to figure out rewards if we exit
-        // figure out which vault we're in
-        const stakedBalance = await pool.balanceOf(depositorAddress);
-        const vault = (await this.vaults()).findByPool(pool);
-        const sharePrice = await vault.getPricePerFullShare();
-        const expectedVaultLPReturn = stakedBalance.mul(sharePrice).div(BigNumber.from(10).pow(18));
-        const lpUnderlyingToken = vault.underlyingToken();
-        // we need to accommodate crv/slp/univ2/univ3
-        const totalSupply = await lpUnderlyingToken.totalSupply();
-        const componentTokens = await lpUnderlyingToken.tokens();
-        // figure out what the amount of LP we get back from exiting the vault
-        // we would receive.
-        return componentTokens.map(token => {
-            return {token, amount: BigNumber.from(0)};
-        });
-    }
-
-    /**
-     * Claim all rewards across all pools.
-     */
-    async claimAllRewards() {
-        await Promise.all((await this.myPools()).map(async ({pool}) => {
-            await pool.claimRewards();
-        }));
-    }
-
-    /**
      * Do a balance check on the contract
      * @param contract
      * @param address

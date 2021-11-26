@@ -599,26 +599,6 @@ describe('Harvest SDK', async () => {
         });
     });
 
-
-    describe("returns for exiting", async () => {
-
-        it("should tell me what my returns are if i exit but don't actually exit", async () => {
-            await withImpersonation(addr)(async (signer) => {
-                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
-                // select first of my available pools
-                const [pool1] = await harvest.myPools();
-                await Promise.all([pool1].map(async ({balance, pool}) => {
-                    const tokens = await harvest.expectedReturns(pool);
-                    expect(tokens.length).to.be.eq(3); // expect back 2 LP tokens and 1 rewards token
-                    const [a, b, reward] = tokens;
-                    console.log(`POOL [${pool.name}] ${a.token.symbol} [${a.token.address}]: ${ethers.utils.formatUnits(a.amount, a.token.decimals)}`);
-                    console.log(`POOL [${pool.name}] ${b.token.symbol} [${b.token.address}]: ${ethers.utils.formatUnits(b.amount, b.token.decimals)}`);
-                    console.log(`POOL [${pool.name}] ${reward.token.symbol} [${reward.token.address}]: ${ethers.utils.formatUnits(reward.amount, reward.token.decimals)}`);
-                }));
-            });
-        }).timeout(600000);
-    });
-
     /**
      * FYI this might fail if the contracts in the tokens/pools are newer than the block
      * we're using for testing, in this situation it's advisable to update the block number
@@ -670,56 +650,6 @@ describe('Harvest SDK', async () => {
             expect(res).to.deep.eq(expectedFixture);
         });
     });
-
-    describe("crv token separation", async() => {
-
-        it("should work", async () => {
-            const [signer] = await ethers.getSigners();
-            const yCRV = "0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8";
-            const contr = new ethers.Contract("0x73a052500105205d34Daf004eAb301916DA8190f", erc20Abi, signer); // TUSD
-            console.log(`${await contr.balanceOf(yCRV)}`);
-
-            // const yPool = '0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51';
-            // const crvPoolABI = [{"name":"TokenExchange","inputs":[{"type":"address","name":"buyer","indexed":true},{"type":"int128","name":"sold_id","indexed":false},{"type":"uint256","name":"tokens_sold","indexed":false},{"type":"int128","name":"bought_id","indexed":false},{"type":"uint256","name":"tokens_bought","indexed":false}],"anonymous":false,"type":"event"},{"name":"TokenExchangeUnderlying","inputs":[{"type":"address","name":"buyer","indexed":true},{"type":"int128","name":"sold_id","indexed":false},{"type":"uint256","name":"tokens_sold","indexed":false},{"type":"int128","name":"bought_id","indexed":false},{"type":"uint256","name":"tokens_bought","indexed":false}],"anonymous":false,"type":"event"},{"name":"AddLiquidity","inputs":[{"type":"address","name":"provider","indexed":true},{"type":"uint256[4]","name":"token_amounts","indexed":false},{"type":"uint256[4]","name":"fees","indexed":false},{"type":"uint256","name":"invariant","indexed":false},{"type":"uint256","name":"token_supply","indexed":false}],"anonymous":false,"type":"event"},{"name":"RemoveLiquidity","inputs":[{"type":"address","name":"provider","indexed":true},{"type":"uint256[4]","name":"token_amounts","indexed":false},{"type":"uint256[4]","name":"fees","indexed":false},{"type":"uint256","name":"token_supply","indexed":false}],"anonymous":false,"type":"event"},{"name":"RemoveLiquidityImbalance","inputs":[{"type":"address","name":"provider","indexed":true},{"type":"uint256[4]","name":"token_amounts","indexed":false},{"type":"uint256[4]","name":"fees","indexed":false},{"type":"uint256","name":"invariant","indexed":false},{"type":"uint256","name":"token_supply","indexed":false}],"anonymous":false,"type":"event"},{"name":"CommitNewAdmin","inputs":[{"type":"uint256","name":"deadline","indexed":true,"unit":"sec"},{"type":"address","name":"admin","indexed":true}],"anonymous":false,"type":"event"},{"name":"NewAdmin","inputs":[{"type":"address","name":"admin","indexed":true}],"anonymous":false,"type":"event"},{"name":"CommitNewParameters","inputs":[{"type":"uint256","name":"deadline","indexed":true,"unit":"sec"},{"type":"uint256","name":"A","indexed":false},{"type":"uint256","name":"fee","indexed":false},{"type":"uint256","name":"admin_fee","indexed":false}],"anonymous":false,"type":"event"},{"name":"NewParameters","inputs":[{"type":"uint256","name":"A","indexed":false},{"type":"uint256","name":"fee","indexed":false},{"type":"uint256","name":"admin_fee","indexed":false}],"anonymous":false,"type":"event"},{"outputs":[],"inputs":[{"type":"address[4]","name":"_coins"},{"type":"address[4]","name":"_underlying_coins"},{"type":"address","name":"_pool_token"},{"type":"uint256","name":"_A"},{"type":"uint256","name":"_fee"}],"constant":false,"payable":false,"type":"constructor"},{"name":"get_virtual_price","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":1535185},{"name":"calc_token_amount","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"uint256[4]","name":"amounts"},{"type":"bool","name":"deposit"}],"constant":true,"payable":false,"type":"function","gas":6067881},{"name":"add_liquidity","outputs":[],"inputs":[{"type":"uint256[4]","name":"amounts"},{"type":"uint256","name":"min_mint_amount"}],"constant":false,"payable":false,"type":"function","gas":9327083},{"name":"get_dy","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dx"}],"constant":true,"payable":false,"type":"function","gas":3454227},{"name":"get_dx","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dy"}],"constant":true,"payable":false,"type":"function","gas":3454232},{"name":"get_dy_underlying","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dx"}],"constant":true,"payable":false,"type":"function","gas":3454087},{"name":"get_dx_underlying","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dy"}],"constant":true,"payable":false,"type":"function","gas":3454093},{"name":"exchange","outputs":[],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dx"},{"type":"uint256","name":"min_dy"}],"constant":false,"payable":false,"type":"function","gas":7030208},{"name":"exchange_underlying","outputs":[],"inputs":[{"type":"int128","name":"i"},{"type":"int128","name":"j"},{"type":"uint256","name":"dx"},{"type":"uint256","name":"min_dy"}],"constant":false,"payable":false,"type":"function","gas":7050194},{"name":"remove_liquidity","outputs":[],"inputs":[{"type":"uint256","name":"_amount"},{"type":"uint256[4]","name":"min_amounts"}],"constant":false,"payable":false,"type":"function","gas":240409},{"name":"remove_liquidity_imbalance","outputs":[],"inputs":[{"type":"uint256[4]","name":"amounts"},{"type":"uint256","name":"max_burn_amount"}],"constant":false,"payable":false,"type":"function","gas":9326310},{"name":"commit_new_parameters","outputs":[],"inputs":[{"type":"uint256","name":"amplification"},{"type":"uint256","name":"new_fee"},{"type":"uint256","name":"new_admin_fee"}],"constant":false,"payable":false,"type":"function","gas":145867},{"name":"apply_new_parameters","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":133482},{"name":"revert_new_parameters","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":21805},{"name":"commit_transfer_ownership","outputs":[],"inputs":[{"type":"address","name":"_owner"}],"constant":false,"payable":false,"type":"function","gas":74482},{"name":"apply_transfer_ownership","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":60538},{"name":"revert_transfer_ownership","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":21895},{"name":"withdraw_admin_fees","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":22667},{"name":"kill_me","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":37848},{"name":"unkill_me","outputs":[],"inputs":[],"constant":false,"payable":false,"type":"function","gas":21985},{"name":"coins","outputs":[{"type":"address","name":"out"}],"inputs":[{"type":"int128","name":"arg0"}],"constant":true,"payable":false,"type":"function","gas":2160},{"name":"underlying_coins","outputs":[{"type":"address","name":"out"}],"inputs":[{"type":"int128","name":"arg0"}],"constant":true,"payable":false,"type":"function","gas":2190},{"name":"balances","outputs":[{"type":"uint256","name":"out"}],"inputs":[{"type":"int128","name":"arg0"}],"constant":true,"payable":false,"type":"function","gas":2220},{"name":"A","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2051},{"name":"fee","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2081},{"name":"admin_fee","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2111},{"name":"owner","outputs":[{"type":"address","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2141},{"name":"admin_actions_deadline","outputs":[{"type":"uint256","unit":"sec","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2171},{"name":"transfer_ownership_deadline","outputs":[{"type":"uint256","unit":"sec","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2201},{"name":"future_A","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2231},{"name":"future_fee","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2261},{"name":"future_admin_fee","outputs":[{"type":"uint256","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2291},{"name":"future_owner","outputs":[{"type":"address","name":"out"}],"inputs":[],"constant":true,"payable":false,"type":"function","gas":2321}];
-            // const harvest = new HarvestSDK({chainId: Chain.ETH});
-            // const vault = (await harvest.vaults()).findByName("YCRV");
-        });
-    });
-
-
-    it('should exit my positions', async() => {
-
-        await withImpersonation("0xd1BbcA0dfDe1F51CCd17E33DE1A7EAD48fAa1D68")(async signer => {
-            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH});
-            const myPools = await harvest.myPools();
-            await Promise.all(myPools.map(async ({balance, pool}) => {
-                console.log(`Attempting to unstake and withdraw ${pool.name}`);
-                await harvest.unstakeAndWithdraw(pool, balance);
-                console.log(`Unstaked and withdrew ${pool.name}`);
-            }));
-
-            const myLPs = await harvest.myTokens();
-            myLPs.forEach(({balance, token}) => {
-                console.log(`I now hold ${token.symbol} [${token.address}] : ${ethers.utils.formatUnits(balance, token.decimals)}`)
-            });
-        })
-
-    }).timeout(100000);
-
-    it("should allow me to approve", async () => {
-        await withImpersonation(addr)(async signer => {
-            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH});
-            const vaults = await harvest.vaults();
-
-            // find the appropriate vault
-            const crvTriCryptoVault = vaults.findByName("crvTricrypto"); // case insensitive
-            // approve full balance of tri crypto LP tokens.
-            const balanceOfTriCryptoLP = await crvTriCryptoVault.underlyingToken().balanceOf(await signer.getAddress());
-            const tx = await harvest.approve(crvTriCryptoVault, balanceOfTriCryptoLP);
-
-            console.log(tx);
-        })
-    })
 
 });
 

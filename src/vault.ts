@@ -4,7 +4,7 @@
 import {BigNumber, ContractReceipt, ethers} from "ethers";
 import {Chain} from "./chain";
 import vaultAbi from './abis/vault.json';
-import {LPToken, Token, UniV2LPToken} from "./token";
+import {Token} from "./token";
 import {InvalidPoolError, InvalidVaultAddressError, InvalidVaultNameError} from "./errors";
 import {Pool} from "./pool";
 
@@ -74,8 +74,8 @@ export class Vault {
      * This only serves up the first token, in the case of erc721 uniswapv3 this will be wrong.
      * @todo resolve issues around uniswapv3, needs the correct ABI dependent on underlying
      */
-    underlyingToken(): LPToken {
-        return new UniV2LPToken({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0], decimals: this.decimals, symbol: this.symbol});
+    underlyingToken(): Token {
+        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0], decimals: this.decimals, symbol: this.symbol});
     }
 
 }
