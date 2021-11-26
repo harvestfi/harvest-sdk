@@ -4,11 +4,20 @@
 import {BigNumber, ContractReceipt, ethers} from "ethers";
 import {Chain} from "./chain";
 import vaultAbi from './abis/vault.json';
-import {Token} from "./token";
+import {LPToken, Token, UniV2LPToken} from "./token";
 import {InvalidPoolError, InvalidVaultAddressError, InvalidVaultNameError} from "./errors";
 import {Pool} from "./pool";
 
 type Address = string;
+
+interface VaultConstructorArgs {
+    signerOrProvider: ethers.Signer | ethers.providers.Provider,
+    chainId: Chain,
+    address: string,
+    decimals: number,
+    tokens: string[]
+    symbol: string,
+}
 
 export class Vault {
     /**
@@ -22,7 +31,8 @@ export class Vault {
     readonly tokens: string[];
     readonly symbol: string;
 
-    constructor(signerOrProvider: ethers.Signer|ethers.providers.Provider, chainId: Chain, address: Address, decimals: number, tokens: Address[], symbol: string) {
+    constructor(vaultArgs: VaultConstructorArgs) {
+        const {signerOrProvider, chainId, address, decimals, symbol, tokens} = vaultArgs;
         this.signerOrProvider = signerOrProvider;
         this.contract = new ethers.Contract(address, vaultAbi, this.signerOrProvider);
         this.address = address;
@@ -64,8 +74,8 @@ export class Vault {
      * This only serves up the first token, in the case of erc721 uniswapv3 this will be wrong.
      * @todo resolve issues around uniswapv3, needs the correct ABI dependent on underlying
      */
-    underlyingToken(): Token {
-        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0], decimals: this.decimals, symbol: this.symbol});
+    underlyingToken(): LPToken {
+        return new UniV2LPToken({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0], decimals: this.decimals, symbol: this.symbol});
     }
 
 }

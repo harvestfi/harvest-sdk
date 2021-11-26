@@ -90,3 +90,53 @@ export class Tokens {
     }
 
 }
+
+export abstract class LPToken extends Token {
+    abstract totalSupply(): Promise<BigNumber>
+    abstract tokens(): Promise<Token[]>
+}
+
+/**
+ * Curve tokens are single assets
+ * and have associated pool contracts that contains information
+ * about the breakdown of tokens.
+ */
+export class CRVLPToken extends LPToken {
+    constructor(tokenArgs: TokenConstructor) {
+        super(tokenArgs);
+    }
+    totalSupply(): Promise<BigNumber> {
+        return Promise.resolve(BigNumber.from(0));
+    }
+    tokens(): Promise<Token[]> {
+        return Promise.reject("Not implemented");
+    }
+}
+
+export class UniV2LPToken extends Token implements LPToken {
+    constructor(tokenArgs: TokenConstructor) {
+        super({...tokenArgs, abi: univ2Abi});
+    }
+    totalSupply(): Promise<BigNumber> {
+        return Promise.resolve(BigNumber.from(0));
+    }
+    tokens(): Promise<Token[]> {
+        return Promise.reject("Not implemented");
+    }
+}
+
+/**
+ * Sushi is a clone of uniswapv2 and thus basically has the same
+ * ABI as univ2
+ */
+export class SushiLPToken extends Token implements LPToken {
+    constructor(tokenArgs: TokenConstructor) {
+        super({...tokenArgs, abi: univ2Abi});
+    }
+    totalSupply(): Promise<BigNumber> {
+        return Promise.resolve(BigNumber.from(0));
+    }
+    tokens(): Promise<Token[]> {
+        return Promise.reject("Not implemented");
+    }
+}

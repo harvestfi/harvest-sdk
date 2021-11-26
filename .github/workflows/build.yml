@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - "*"
+      - "!**-alpha"
 
 jobs:
   build-and-test:
@@ -21,8 +22,14 @@ jobs:
         env:
           ALCHEMY_ETH_API_KEY: ${{ secrets.ALCHEMY_ETH_API_KEY }}
           ETH_PINNED_BLOCK: 13433444
+  deploy:
+    needs: build-and-test
+    steps:
       - name: Package for NPM
         run: npm run package
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_AUTH_TOKEN }}
       - name: Publish to NPM
         run: npm publish dist --access public
         env:

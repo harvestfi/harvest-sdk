@@ -37,8 +37,8 @@ export class Pool {
     readonly name?: string;
     readonly rewards: string[];
 
-    constructor(args: PoolConstructorArgs) {
-        const {signerOrProvider, chainId, address, collateralAddress, name, rewards} = args;
+    constructor(poolArgs: PoolConstructorArgs) {
+        const {signerOrProvider, chainId, address, collateralAddress, name, rewards} = poolArgs;
         this.signerOrProvider = signerOrProvider;
         this.contract = new ethers.Contract(address, poolAbi, this.signerOrProvider);
         this.address = address;
@@ -48,6 +48,10 @@ export class Pool {
         this.rewards = rewards;
     }
 
+    /**
+     * Retrieve the balance of the supplied address.
+     * @param address
+     */
     async balanceOf(address: string): Promise<BigNumber> {
         try {
             return await this.contract.balanceOf(address);
@@ -85,7 +89,7 @@ export class Pool {
      * Withdraw an amount (in wei) from the pool
      * @param amountInWei
      */
-    async withdraw(amountInWei: BigNumber) {
+    async withdraw(amountInWei: BigNumber): Promise<ContractReceipt> {
         const tx = await this.contract.withdraw(amountInWei);
         return await tx.wait();
     }
@@ -96,7 +100,7 @@ export class Pool {
      * that has been approved to spend by the pool contract.
      * @param amountInWei
      */
-    async stake(amountInWei: BigNumber) {
+    async stake(amountInWei: BigNumber): Promise<ContractReceipt> {
         const tx = await this.contract.stake(amountInWei);
         return await tx.wait();
     }

@@ -135,7 +135,7 @@ export class HarvestSDK {
                     .filter((symbol) => tokens[symbol].vaultAddress)
                     .map((symbol) => {
                         const tokenAddresses = Array.isArray(tokens[symbol].tokenAddress) ? tokens[symbol].tokenAddress : [tokens[symbol].tokenAddress];
-                        return new Vault(this.signerOrProvider, parseInt(tokens[symbol].chain), tokens[symbol].vaultAddress, tokens[symbol].decimals, tokenAddresses, symbol);
+                        return new Vault({signerOrProvider: this.signerOrProvider, chainId: parseInt(tokens[symbol].chain), address: tokens[symbol].vaultAddress, decimals: tokens[symbol].decimals, tokens: tokenAddresses, symbol});
                     }));
                 return this._vaults;
             });
@@ -152,17 +152,17 @@ export class HarvestSDK {
         if (this._pools) return this._pools;
         else {
             const theFilter = chainFilter(await this.getChainId());
-            return await fetch(this.harvestPoolsEndpoint).then(_ => _.json()).then(_ => _.data).then((pools: any) => {
-                this._pools = new Pools(Object.keys(pools)
-                    .filter((name) => theFilter(pools[name]))
-                    .map((name) => {
+            return await fetch(this.harvestPoolsEndpoint).then(_ => _.json()).then(_ => _.data).then((pools: any[]) => {
+                this._pools = new Pools(pools
+                    .filter(theFilter)
+                    .map((pool) => {
                         return new Pool({
                             signerOrProvider: this.signerOrProvider,
-                            chainId: parseInt(pools[name].chain),
-                            address: pools[name].contractAddress,
-                            collateralAddress: pools[name].collateralAddress,
-                            name: pools[name].id,
-                            rewards: pools[name].rewardTokens
+                            chainId: parseInt(pool.chain),
+                            address: pool.contractAddress,
+                            collateralAddress: pool.collateralAddress,
+                            name: pool.id,
+                            rewards: pool.rewardTokens
                         });
                     })
                 );
@@ -285,6 +285,41 @@ export class HarvestSDK {
     }
 
     /**
+     * Gives back a list of {token: Token,return: BigNumber} pairs
+     * to give an indication of what yield would be gained on exiting
+     * a pool.
+     * @param pool
+     */
+    async expectedReturns(pool: Pool): Promise<{token: Token, amount: BigNumber}[]> {
+        const depositorAddress = await (this.signerOrProvider as ethers.Signer).getAddress();
+        const {token: rewardToken, amount: rewardAmount} = await pool.earned(depositorAddress);
+        // for this pool we need to figure out rewards if we exit
+        // figure out which vault we're in
+        const stakedBalance = await pool.balanceOf(depositorAddress);
+        const vault = (await this.vaults()).findByPool(pool);
+        const sharePrice = await vault.getPricePerFullShare();
+        const expectedVaultLPReturn = stakedBalance.mul(sharePrice).div(BigNumber.from(10).pow(18));
+        const lpUnderlyingToken = vault.underlyingToken();
+        // we need to accommodate crv/slp/univ2/univ3
+        const totalSupply = await lpUnderlyingToken.totalSupply();
+        const componentTokens = await lpUnderlyingToken.tokens();
+        // figure out what the amount of LP we get back from exiting the vault
+        // we would receive.
+        return componentTokens.map(token => {
+            return {token, amount: BigNumber.from(0)};
+        });
+    }
+
+    /**
+     * Claim all rewards across all pools.
+     */
+    async claimAllRewards() {
+        await Promise.all((await this.myPools()).map(async ({pool}) => {
+            await pool.claimRewards();
+        }));
+    }
+
+    /**
      * Do a balance check on the contract
      * @param contract
      * @param address
@@ -307,7 +342,5 @@ export class HarvestSDK {
         const allowance = await contract.allowance(owner, spender);
         return allowance.gte(amount) && amount.gt(0);
     }
-
-
 
 }
