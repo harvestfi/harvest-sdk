@@ -1,4 +1,4 @@
-import {IWithdrawalStrategy} from "./IWithdrawalStrategy";
+import {IWithdrawalStrategy} from "./iWithdrawalStrategy";
 import {IToken} from "../../tokens/token";
 import {BigNumber, ethers, Signer} from "ethers";
 import vaultAbi from "../../abis/vault.json";
