@@ -8,7 +8,7 @@ import {Chain} from "./chain";
 import poolAbi from './abis/pool.json';
 import erc20Abi from './abis/erc20.json';
 import {Vault} from "./vault";
-import {Token} from "./token";
+import {IToken, Token} from "./tokens/token";
 
 interface EarnedAmount {
     token: Token,
@@ -64,13 +64,13 @@ export class Pool {
      * Claim rewards, most rewards are expected to be FARM or iFARM tokens.
      * @return Promise<Token>
      */
-    async claimRewards(): Promise<Token> {
+    async claimRewards(): Promise<IToken> {
         const tx = await this.contract.getReward();
         await tx.wait();
         // figure out the rewards tokens
         const rewardAddress = await this.contract.rewardToken();
         const tokenContract = new Contract(rewardAddress, erc20Abi, this.signerOrProvider);
-        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: rewardAddress, decimals: await tokenContract.decimals()});
+        return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: rewardAddress, decimals: await tokenContract.decimals(), symbol: await tokenContract.symbol()});
     }
 
     /**

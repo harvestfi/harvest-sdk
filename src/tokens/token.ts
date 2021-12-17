@@ -1,10 +1,6 @@
-/**
- * Represents an ERC20 token with a unique address and some metadata.
- */
-import {Chain} from "./chain";
 import {BigNumber, Contract, ContractReceipt, ethers} from "ethers";
-import univ2Abi from './abis/univ2lp.json';
-import erc20Abi from './abis/erc20.json';
+import {Chain} from "../chain";
+import erc20Abi from "../abis/erc20.json";
 
 export interface TokenConstructor {
     signerOrProvider: ethers.Signer | ethers.providers.Provider,
@@ -16,11 +12,18 @@ export interface TokenConstructor {
 }
 
 export interface IToken {
+    readonly contract: Contract;
+    readonly address: string;
+    readonly chainId: Chain;
+    readonly decimals: number;
+    readonly symbol?: string;
+    readonly abi?: object[];
     balanceOf(address: String): Promise<BigNumber>
-    approve(amount: BigNumber): Promise<ContractReceipt>
+    allowance(address: string, spender: string): Promise<BigNumber>
+    approve(address: string, amount: BigNumber): Promise<ContractReceipt>
 }
 
-export class Token {
+export class Token implements IToken {
     /**
      * The contract address on the chain on which this token lives
      */
@@ -46,7 +49,7 @@ export class Token {
     /**
      * Return the balanceOf the contract, handling errors
      * where we cannot seem to find the balance of the contract
-     * this deciding it is 0 instead of failing.
+     * thus deciding it is 0 instead of failing.
      * @param address
      */
     async balanceOf(address: string): Promise<BigNumber> {
@@ -61,32 +64,8 @@ export class Token {
         const tx = await this.contract.approve(address, amount);
         return await tx.wait();
     }
-}
 
-/**
- * @todo sort out issues around uniswap v3 tokens
- */
-export class Tokens {
-
-    private bySymbol = new Map<string, Token>();
-    private byAddress = new Map<string, Token>();
-    readonly tokens: Token[];
-
-    constructor(tokens: Token[]) {
-        // todo this filters uniswap v3 due to the token having an array of addresses.
-        this.tokens = tokens.filter(token => !Array.isArray(token.address));
-        tokens.forEach(token => {
-            if (token.symbol) this.bySymbol.set(token.symbol.toLowerCase(), token);
-            if (!Array.isArray(token.address)) this.byAddress.set(token.address.toLowerCase(), token);
-        })
+    async allowance(address: string, spender: string): Promise<BigNumber> {
+        return await this.contract.allowance(address, spender);
     }
-
-    findTokenByAddress(address: string) {
-        return this.byAddress.get(address.toLowerCase())!;
-    }
-
-    findTokenBySymbol(symbol: string) {
-        return this.bySymbol.get(symbol.toLowerCase())!;
-    }
-
 }

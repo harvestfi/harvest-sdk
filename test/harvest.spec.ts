@@ -5,7 +5,6 @@ import {HarvestSDK} from "../src/harvest";
 import {Chain} from "../src/chain";
 import {BigNumber} from "ethers";
 import wethAbi from '../src/abis/weth.json';
-import erc20Abi from '../src/abis/erc20.json';
 import {
     InsufficientApprovalError,
     InsufficientPoolBalanceError,
@@ -121,7 +120,7 @@ describe('Harvest SDK', async () => {
             // should only be 1 vault with this name.
             expect(maybeVault).to.not.be.eq(undefined);
             expect(maybeVault?.address).to.be.eq(farm_crvTricypto);
-            expect(maybeVault.tokens[0]).to.be.eq(crvTricrypto);
+            expect(maybeVault.tokens[0].address).to.be.eq(crvTricrypto);
         });
 
         it("should allow me to list all vaults", async () => {
@@ -501,7 +500,7 @@ describe('Harvest SDK', async () => {
                  * use pre-existing pool we should be in
                  */
                 const sushiEthPool = pools.findByName("SUSHI-ETH-USDT-HODL");
-                const token = await harvest.unstakeAndWithdraw(sushiEthPool, await sushiEthPool.balanceOf(address));
+                const [token] = await harvest.unstakeAndWithdraw(sushiEthPool, await sushiEthPool.balanceOf(address));
                 expect((await token.balanceOf(address)).gt(0));
             });
         });
@@ -523,26 +522,6 @@ describe('Harvest SDK', async () => {
                 }
             });
         });
-
-        it("should allow me to be awesome", async () => {
-            // initialise the harvest SDK
-            const [signer] = (await ethers.getSigners());
-            const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH});
-
-            // convert 1 eth to weth
-            const weth = new ethers.Contract(wethContractAddress, wethAbi, signer);
-            await weth.deposit({value: ethers.utils.parseEther("1")});
-
-            // find the weth vault
-            const wethVault = (await harvest.vaults()).findByName("WETH"); // search is case insensitive
-
-            // deposit and stake ALL YOUR WETH
-            const pool = await harvest.depositAndStake(wethVault, await wethVault.underlyingToken().balanceOf(await signer.getAddress()));
-
-            console.log(`You are now in the WETH pool with a staked balance of : ${(await pool.balanceOf(await signer.getAddress())).toString()}`);
-
-        });
-
     });
 
     describe("rewards", async () => {
@@ -649,6 +628,37 @@ describe('Harvest SDK', async () => {
 
             expect(res).to.deep.eq(expectedFixture);
         });
+    });
+
+    describe("uni v3", async () => {
+        it("should allow me to unstake and withdraw a uni v3 position", async () => {
+            // await hre.network.provider.send("evm_setIntervalMining", [1000]);
+            await withImpersonation(addr)(async (signer) => {
+
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+
+                const mypools = await harvest.myPools();
+
+                /**
+                 * Shuffle the univ3 pools and take 10 items (effectively random)
+                 */
+                const randomPools = mypools
+                    .filter(({pool}) => pool.name?.toLowerCase().startsWith("univ3"))
+                    .sort(() => (Math.random() > .5) ? 1 : -1).slice(0,10);
+
+                // sequentially unstake
+                for(let i=0; i<randomPools.length; i++){
+                    const pool = randomPools[i].pool;
+                    const balance = randomPools[i].balance;
+                    const tokens = await harvest.unstakeAndWithdraw(pool, balance);
+                    expect(tokens.length).to.be.eq(3);
+                    for(let j=0; j<tokens.length; j++){
+                        expect((await tokens[j].balanceOf(addr)).gt(0)).to.eq(true);
+                    }
+                }
+
+            });
+        }).timeout(1000000);
     });
 
 });

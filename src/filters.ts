@@ -1,4 +1,3 @@
-import {Token} from "./token";
 import {Chain} from "./chain";
 
 export const chainFilter = (chain: Chain) => (token: any) => {
