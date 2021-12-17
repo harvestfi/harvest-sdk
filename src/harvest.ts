@@ -1,7 +1,8 @@
 import {BigNumber, Contract, ContractReceipt, ethers, Signer} from "ethers";
 import fetch from "node-fetch";
 import {chainFilter} from "./filters";
-import {Token, Tokens} from "./token";
+import {IToken, Token} from "./tokens/token";
+import {Tokens} from "./tokens";
 import {Chain} from "./chain";
 import {Vault, Vaults} from "./vault";
 import vaultAbi from './abis/vault.json'
@@ -17,6 +18,8 @@ import {
     InvalidAmountError
 } from "./errors";
 import {Networks} from "./networks";
+import {Univ3VaultWithdrawals} from "./strategies/withdrawals/univ3VaultWithdrawals";
+import {Univ2VaultWithdrawals} from "./strategies/withdrawals/univ2VaultWithdrawals";
 
 interface HarvestSDKArgs {
     signerOrProvider?: ethers.Signer | ethers.providers.Provider;
@@ -83,15 +86,13 @@ export class HarvestSDK {
      * @param vault Vault
      * @param amount BigNumber
      */
-    async withdraw(vault: Vault, amount: BigNumber): Promise<ContractReceipt> {
-        const contract = new ethers.Contract(vault.address, vaultAbi, this.signerOrProvider);
+    async withdraw(vault: Vault, amount: BigNumber): Promise<IToken[]> {
         // check balance
         // fail if asking for more than the balance available
-        if (!await this.checkBalance(contract, await (this.signerOrProvider as Signer).getAddress(), amount)) {
+        if (!await this.checkBalance(vault.contract, await (this.signerOrProvider as Signer).getAddress(), amount)) {
             throw new InvalidAmountError(amount);
         }
-        const tx = await contract.withdraw(amount);
-        return await tx.wait();
+        return await vault.withdraw(amount);
     }
 
     /**
@@ -128,14 +129,17 @@ export class HarvestSDK {
     async vaults(): Promise<Vaults> {
         if (this._vaults) return this._vaults;
         else {
+            const tokensMap = await this.tokens();
             const theFilter = chainFilter(await this.getChainId());
             return await fetch(this.harvestTokensEndpoint).then(_ => _.json()).then(_ => _.data).then((tokens: any) => {
                 this._vaults = new Vaults(Object.keys(tokens)
                     .filter((symbol) => theFilter(tokens[symbol]))
                     .filter((symbol) => tokens[symbol].vaultAddress)
                     .map((symbol) => {
-                        const tokenAddresses = Array.isArray(tokens[symbol].tokenAddress) ? tokens[symbol].tokenAddress : [tokens[symbol].tokenAddress];
-                        return new Vault({signerOrProvider: this.signerOrProvider, chainId: parseInt(tokens[symbol].chain), address: tokens[symbol].vaultAddress, decimals: tokens[symbol].decimals, tokens: tokenAddresses, symbol});
+                        const tokenAddresses: string[] = Array.isArray(tokens[symbol].tokenAddress) ? tokens[symbol].tokenAddress : [tokens[symbol].tokenAddress];
+                        const tokenObjects = tokenAddresses.map(tokenAddress => tokensMap.findTokenByAddress(tokenAddress));
+                        const withdrawStrategy = Array.isArray(tokens[symbol].tokenAddress) ? new Univ3VaultWithdrawals({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider}) : new Univ2VaultWithdrawals({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider});
+                        return new Vault({signerOrProvider: this.signerOrProvider, chainId: parseInt(tokens[symbol].chain), address: tokens[symbol].vaultAddress, decimals: tokens[symbol].decimals, tokens: tokenObjects, symbol, withdrawStrategy});
                     }));
                 return this._vaults;
             });
@@ -177,7 +181,7 @@ export class HarvestSDK {
      * @param address string
      * @return Promise<{ balance: BigNumber; pool: Pool }[]>
      */
-    async myTokens(address?: string): Promise<{ balance: BigNumber; token: Token }[]> {
+    async myTokens(address?: string): Promise<{ balance: BigNumber; token: IToken }[]> {
         const theAddress = address || await (this.signerOrProvider as Signer).getAddress();
         const allTokens = await this.tokens();
         const tokenBalances = await Promise.all(allTokens.tokens.map(async token => {
@@ -271,17 +275,20 @@ export class HarvestSDK {
      * events that are required to reverse from a stake position -> vault position -> underlying token
      * @param pool Pool
      * @param amount BigNumber
+     * @return IToken[] the tokens that were returned to the users wallet
      */
-    async unstakeAndWithdraw(pool: Pool, amount: BigNumber): Promise<Token> {
+    async unstakeAndWithdraw(pool: Pool, amount: BigNumber): Promise<IToken[]> {
         const vault = await this.vaults().then(_ => _.findByPool(pool));
-        if (vault.tokens.length > 1) throw new Erc721Error();
+        // if (vault.tokens.length > 1) throw new Erc721Error();
         await this.unstake(pool, amount);
-        await pool.claimRewards();
+        const rewardToken = await pool.claimRewards();
         const depositorAddress = await (this.signerOrProvider as Signer).getAddress();
-        // we withdraw the entire balance of the vault. @todo this might not be entirely right.
+        // we withdraw the entire balance of the vault.
+        // @todo this might not be entirely right. the reason being it might pull back any current vault funds that were not part of the unstaked amount
         const currentBalanceOfVault = await vault.balanceOf(depositorAddress);
-        await this.withdraw(vault, currentBalanceOfVault);
-        return vault.underlyingToken();
+        const tokens = await this.withdraw(vault, currentBalanceOfVault);
+        return [...tokens, rewardToken];
+        // return vault.underlyingToken();
     }
 
     /**
