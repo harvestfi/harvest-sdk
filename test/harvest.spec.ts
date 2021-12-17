@@ -651,7 +651,6 @@ describe('Harvest SDK', async () => {
                     const pool = randomPools[i].pool;
                     const balance = randomPools[i].balance;
                     const tokens = await harvest.unstakeAndWithdraw(pool, balance);
-                    console.log(`${pool.name}`);
                     expect(tokens.length).to.be.eq(3);
                     for(let j=0; j<tokens.length; j++){
                         expect((await tokens[j].balanceOf(addr)).gt(0)).to.eq(true);
