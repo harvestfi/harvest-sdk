@@ -1,4 +1,4 @@
-import {IWithdrawalStrategy} from "./IWithdrawalStrategy";
+import {IWithdrawalStrategy} from "./iWithdrawalStrategy";
 import {BigNumber, ContractReceipt, ethers} from "ethers";
 import uniV3VaultAbi from "../../abis/univ3vault.json";
 
