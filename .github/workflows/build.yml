@@ -33,6 +33,7 @@ jobs:
         with:
           node-version: '12'
           registry-url: 'https://registry.npmjs.org'
+      - run: npm install
       - name: Package for NPM
         run: npm run package
       - uses: JS-DevTools/npm-publish@v1
