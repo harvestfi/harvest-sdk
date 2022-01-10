@@ -40,8 +40,4 @@ jobs:
         with:
           token: ${{ secrets.NPM_AUTH_TOKEN }}
           access: public
-#      - name: Publish to NPM
-#        run: npm publish dist --access public
-#        env:
-#          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 

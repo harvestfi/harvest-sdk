@@ -8,10 +8,13 @@ import {IToken, Token} from "./tokens/token";
 import {InvalidPoolError, InvalidVaultAddressError, InvalidVaultNameError} from "./errors";
 import {Pool} from "./pool";
 import {IWithdrawalStrategy} from "./strategies/withdrawals/iWithdrawalStrategy";
+import {Univ3VaultDeposits} from "./strategies/deposits/univ3VaultDeposits";
+import {TokenAmount} from "./strategies/deposits/TokenAmount";
+import {IDepositStrategy} from "./strategies/deposits/iDepositStrategy";
 
 type Address = string;
 
-interface VaultConstructorArgs {
+interface VaultConstructorArgs<T extends BigNumber|TokenAmount[]> {
     signerOrProvider: ethers.Signer | ethers.providers.Provider,
     chainId: Chain,
     address: string,
@@ -19,14 +22,16 @@ interface VaultConstructorArgs {
     tokens: IToken[]
     symbol: string,
     withdrawStrategy: IWithdrawalStrategy
+    depositStrategy: IDepositStrategy<T>
 }
 
-export class Vault {
+export class Vault<T extends BigNumber|TokenAmount[]> {
     /**
      * The contract address on the chain on which this token lives
      */
     private signerOrProvider: ethers.Signer | ethers.providers.Provider;
     private withdrawStrategy: IWithdrawalStrategy;
+    private depositStrategy: IDepositStrategy<T>;
     readonly contract: ethers.Contract;
     readonly address: string;
     readonly chainId: Chain;
@@ -34,11 +39,12 @@ export class Vault {
     readonly tokens: IToken[];
     readonly symbol: string;
 
-    constructor(vaultArgs: VaultConstructorArgs) {
-        const {signerOrProvider, chainId, address, decimals, symbol, tokens, withdrawStrategy} = vaultArgs;
+    constructor(vaultArgs: VaultConstructorArgs<T>) {
+        const {signerOrProvider, chainId, address, decimals, symbol, tokens, withdrawStrategy, depositStrategy} = vaultArgs;
         this.signerOrProvider = signerOrProvider;
         this.contract = new ethers.Contract(address, vaultAbi, this.signerOrProvider);
         this.withdrawStrategy = withdrawStrategy;
+        this.depositStrategy = depositStrategy;
         this.address = address;
         this.chainId = chainId;
         this.decimals = decimals;
@@ -59,9 +65,8 @@ export class Vault {
         return await tx.wait();
     }
 
-    async deposit(amount: BigNumber): Promise<ContractReceipt> {
-        const tx = await this.contract.deposit(amount);
-        return await tx.wait();
+    async deposit(amountOrTokenAmounts: T): Promise<ContractReceipt> {
+        return await this.depositStrategy.deposit(amountOrTokenAmounts);
     }
 
     /**
@@ -81,12 +86,12 @@ export class Vault {
      * @see underlyingTokens()
      */
     underlyingToken(): Token {
-        console.warn("Vault.underlyingToken() method is deprecated and ");
+        console.warn("Vault.underlyingToken() method is deprecated, instead use Vault.underlyingTokens() ");
         return new Token({signerOrProvider: this.signerOrProvider, chainId: this.chainId, address: this.tokens[0].address, decimals: this.decimals, symbol: this.symbol});
     }
 
     /**
-     * This serves up all the tokens that underlie the vault
+     * This serves up all the tokens that make up the vault
      * @return IToken[]
      */
     underlyingTokens(): IToken[] {
@@ -107,13 +112,13 @@ export class Vault {
 
 export class Vaults {
 
-    readonly vaults: Vault[];
+    readonly vaults: Vault<BigNumber|TokenAmount[]>[];
 
-    constructor(vaults: Vault[]) {
+    constructor(vaults: Vault<BigNumber|TokenAmount[]>[]) {
         this.vaults = vaults;
     }
 
-    findByName(name: string): Vault {
+    findByName(name: string): Vault<BigNumber|TokenAmount[]> {
         const vaults = this.vaults.filter(v => {
             return v.symbol?.toLowerCase() === name.toLowerCase();
         });
@@ -122,7 +127,7 @@ export class Vaults {
 
     }
 
-    findByTokens(...tokens: Token[]): Vault {
+    findByTokens(...tokens: Token[]): Vault<BigNumber|TokenAmount[]> {
         const vaults = this.vaults.filter(v => {
             const a = new Set(v.tokens.map(_ => _.address.toLowerCase()));
             return v.tokens.length === tokens.length && tokens.map(_ => _.address.toLowerCase()).filter(_ => a.has(_)).length === tokens.length;
@@ -131,7 +136,7 @@ export class Vaults {
         else throw new InvalidVaultAddressError(`Could not find vault by tokens ${tokens.map(_=>_.symbol).join(",")}`);
     }
 
-    findByAddress(address: Address): Vault {
+    findByAddress(address: Address): Vault<BigNumber|TokenAmount[]> {
         const vaults = this.vaults.filter(v => {
             return v.address === address;
         });
@@ -139,7 +144,7 @@ export class Vaults {
         else throw new InvalidVaultAddressError(`Could not find vault by ${address}`);
     }
 
-    findByPool(pool: Pool): Vault {
+    findByPool(pool: Pool): Vault<BigNumber|TokenAmount[]> {
         const vaults = this.vaults.filter(vault => {
             return pool.collateralAddress === vault.address;
         });

@@ -18,3 +18,4 @@ export class InsufficientPoolBalanceError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class InsufficientApprovalError extends Error {}
 export class HarvestSDKArgsError extends Error {}
+export class InvalidTokenAmountsError extends Error {}

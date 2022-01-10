@@ -631,6 +631,30 @@ describe('Harvest SDK', async () => {
     });
 
     describe("uni v3", async () => {
+
+        it("should allow me to deposit and stake a uni v3 position", async() =>  {
+            await withImpersonation(addr)(async (signer) => {
+
+                const harvest = new HarvestSDK({signerOrProvider: signer, chainId: Chain.ETH}); // eth mainnet
+
+                const pools = await harvest.pools();
+                const vaults = await harvest.vaults();
+                const donPool = pools.findByName("UniV3_DON_WETH_full_range");
+                const vault = vaults.findByPool(donPool);
+
+                // the test account has a positive balance of DON/WETH already, so we just leverage the unstake/withdraw functionality to give our wallet back
+                // a balance it can work with.
+                const tokens = await harvest.unstakeAndWithdraw(donPool, await donPool.balanceOf(addr));
+                expect((await donPool.balanceOf(addr)).eq(BigNumber.from(0))).to.be.eq(true);
+                const amounts = await Promise.all(tokens.map(async token => ({token, amount: await token.balanceOf(addr)})));
+
+                const donPool1 = await harvest.depositAndStake(vault, amounts);
+                expect(donPool1).to.be.eq(donPool);
+                expect((await donPool.balanceOf(addr)).gt(BigNumber.from(0))).to.be.eq(true);
+
+            });
+        });
+
         it("should allow me to unstake and withdraw a uni v3 position", async () => {
             // await hre.network.provider.send("evm_setIntervalMining", [1000]);
             await withImpersonation(addr)(async (signer) => {
@@ -649,6 +673,8 @@ describe('Harvest SDK', async () => {
                 // sequentially unstake
                 for(let i=0; i<randomPools.length; i++){
                     const pool = randomPools[i].pool;
+                    console.log(pool.name);
+
                     const balance = randomPools[i].balance;
                     const tokens = await harvest.unstakeAndWithdraw(pool, balance);
                     expect(tokens.length).to.be.eq(3);
