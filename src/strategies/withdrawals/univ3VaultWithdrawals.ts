@@ -17,8 +17,6 @@ export class Univ3VaultWithdrawals implements IWithdrawalStrategy {
     async withdraw(amount: BigNumber): Promise<ContractReceipt> {
         const contr = new ethers.Contract(this.args.address, uniV3VaultAbi, this.args.signerOrProvider);
         const sqrtPrice = await contr.getSqrtPriceX96();
-        await contr.token0();
-        await contr.token1();
         // @todo bound this slippage/tolerance parameter so a) we don't fail b) we don't expose ourselves to lots of slippage
         const tx = await contr['withdraw(uint256,bool,bool,uint256,uint256)'](amount, true, true, sqrtPrice, BigNumber.from(1));
         return await tx.wait();

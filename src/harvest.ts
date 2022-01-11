@@ -20,12 +20,18 @@ import {
 import {Networks} from "./networks";
 import {Univ3VaultWithdrawals} from "./strategies/withdrawals/univ3VaultWithdrawals";
 import {Univ2VaultWithdrawals} from "./strategies/withdrawals/univ2VaultWithdrawals";
+import {TokenAmount} from "./strategies/deposits/TokenAmount";
+import {Univ3VaultDeposits} from "./strategies/deposits/univ3VaultDeposits";
+import {Univ2VaultDeposits} from "./strategies/deposits/univ2VaultDeposits";
 
 interface HarvestSDKArgs {
     signerOrProvider?: ethers.Signer | ethers.providers.Provider;
     chainId?: Chain;
 }
 
+/**
+ * Harvest SDK
+ */
 export class HarvestSDK {
 
     private readonly signerOrProvider: ethers.Signer | ethers.providers.Provider;
@@ -53,31 +59,36 @@ export class HarvestSDK {
      * Approve a vault to spend the underlying token (belonging to the depositor)
      * If the underlying is already approved, don't approve for additional spend
      * @param vault
-     * @param amount
+     * @param amount BigNumber|TokenAmount[]
      */
-    async approve(vault: Vault, amount: BigNumber): Promise<ContractReceipt> {
-        if (vault.tokens.length > 1) throw new Error("Currently we do not support ERC721 tokens (such as Uniswap v3).");
-        const underlyingContract = vault.underlyingToken();
-        const depositorAddress = await (this.signerOrProvider as ethers.Signer).getAddress();
-        if (await this.checkBalance(underlyingContract.contract, depositorAddress, amount)) {
-            return await underlyingContract.approve(vault.address, amount);
-        } else throw new InsufficientBalanceError(`You do not own enough ${underlyingContract.symbol} tokens. You currently have ${await underlyingContract.balanceOf(depositorAddress)} and you wanted to deposit ${amount}`);
+    async approve<T extends BigNumber|TokenAmount[]>(vault: Vault<T>, amount: T): Promise<ContractReceipt[]> {
+        // if (vault.tokens.length > 1) throw new Error("Currently we do not support ERC721 tokens (such as Uniswap v3).");
+        return await Promise.all(vault.underlyingTokens().map(async token => {
+            const depositorAddress = await (this.signerOrProvider as ethers.Signer).getAddress();
+            const depositAmount = this.determineAmount(amount, token);
+            if (await this.checkBalance(token.contract, depositorAddress, depositAmount)) {
+                return await token.approve(vault.address, depositAmount);
+            } else throw new InsufficientBalanceError(`You do not own enough ${token.symbol} tokens. You currently have ${await token.balanceOf(depositorAddress)} and you wanted to deposit ${amount}`);
+        }));
     }
 
     /**
      * Deposit an amount into a vault, requires you to own the amount
      * of the asset you're interested in depositing.
      * @param vault Vault
-     * @param amount BigNumber
+     * @param amount BigNumber|TokenAmount[]
      */
-    async deposit(vault: Vault, amount: BigNumber) {
-        const address = await (this.signerOrProvider as Signer).getAddress();
-        if (!(await this.checkBalance(vault.underlyingToken().contract, address, amount))) {
-            throw new InvalidAmountError(amount);
-        }
-        if (!(await this.checkAtLeast(vault.underlyingToken().contract, address, vault.address, amount))) {
-            throw new InsufficientApprovalError("Insufficient amount approved");
-        }
+    async deposit<T extends BigNumber|TokenAmount[]>(vault: Vault<T>, amount: T) {
+        await Promise.all(vault.underlyingTokens().map(async token => {
+            const depositorAddress = await (this.signerOrProvider as ethers.Signer).getAddress();
+            const depositAmount = this.determineAmount(amount, token);
+            if (!(await this.checkBalance(token.contract, depositorAddress, depositAmount))) {
+                throw new InvalidAmountError(depositAmount);
+            }
+            if (!(await this.checkAtLeast(token.contract, depositorAddress, vault.address, depositAmount))) {
+                throw new InsufficientApprovalError("Insufficient amount approved");
+            }
+        }));
         return await vault.deposit(amount);
     }
 
@@ -86,7 +97,7 @@ export class HarvestSDK {
      * @param vault Vault
      * @param amount BigNumber
      */
-    async withdraw(vault: Vault, amount: BigNumber): Promise<IToken[]> {
+    async withdraw(vault: Vault<BigNumber|TokenAmount[]>, amount: BigNumber): Promise<IToken[]> {
         // check balance
         // fail if asking for more than the balance available
         if (!await this.checkBalance(vault.contract, await (this.signerOrProvider as Signer).getAddress(), amount)) {
@@ -139,7 +150,8 @@ export class HarvestSDK {
                         const tokenAddresses: string[] = Array.isArray(tokens[symbol].tokenAddress) ? tokens[symbol].tokenAddress : [tokens[symbol].tokenAddress];
                         const tokenObjects = tokenAddresses.map(tokenAddress => tokensMap.findTokenByAddress(tokenAddress));
                         const withdrawStrategy = Array.isArray(tokens[symbol].tokenAddress) ? new Univ3VaultWithdrawals({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider}) : new Univ2VaultWithdrawals({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider});
-                        return new Vault({signerOrProvider: this.signerOrProvider, chainId: parseInt(tokens[symbol].chain), address: tokens[symbol].vaultAddress, decimals: tokens[symbol].decimals, tokens: tokenObjects, symbol, withdrawStrategy});
+                        const depositStrategy = Array.isArray(tokens[symbol].tokenAddress) ? new Univ3VaultDeposits({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider}) : new Univ2VaultDeposits({address: tokens[symbol].vaultAddress, signerOrProvider: this.signerOrProvider});
+                        return new Vault<BigNumber|TokenAmount[]>({signerOrProvider: this.signerOrProvider, chainId: parseInt(tokens[symbol].chain), address: tokens[symbol].vaultAddress, decimals: tokens[symbol].decimals, tokens: tokenObjects, symbol, withdrawStrategy, depositStrategy});
                     }));
                 return this._vaults;
             });
@@ -195,7 +207,7 @@ export class HarvestSDK {
      * @param address string
      * @return Promise<{ balance: BigNumber; vault: Vault }[]>
      */
-    async myVaults(address?: string): Promise<{ balance: BigNumber; vault: Vault }[]> {
+    async myVaults(address?: string): Promise<{ balance: BigNumber; vault: Vault<BigNumber|TokenAmount[]> }[]> {
         const theAddress = address || await (this.signerOrProvider as Signer).getAddress();
         const allVaults = await this.vaults();
         const vaultBalances = await Promise.all(allVaults.vaults.map(vault => {
@@ -240,7 +252,7 @@ export class HarvestSDK {
      * @param amountInWei BigNumber
      * @param signer Signer
      */
-    async unstake(pool: Pool, amountInWei: BigNumber): Promise<Vault> {
+    async unstake(pool: Pool, amountInWei: BigNumber): Promise<Vault<BigNumber|TokenAmount[]>> {
         // check that the user has the appropriate balance of collateral before allowing them to unstake
         if (await this.checkBalance(pool.contract, await (this.signerOrProvider as Signer).getAddress(), amountInWei)) {
             await pool.withdraw(amountInWei);
@@ -257,9 +269,9 @@ export class HarvestSDK {
      * @param amount
      * @param signer
      */
-    async depositAndStake(vault: Vault, amount: BigNumber) {
+    async depositAndStake<T extends BigNumber|TokenAmount[]>(vault: Vault<T>, amount: T) {
         // approve the underlying LP amounts
-        if (vault.tokens.length > 1) throw new Erc721Error();
+        // if (vault.tokens.length > 1) throw new Erc721Error();
         const depositorAddress = await (this.signerOrProvider as Signer).getAddress();
         await this.approve(vault, amount);
         await this.deposit(vault, amount);
@@ -315,4 +327,26 @@ export class HarvestSDK {
         return allowance.gte(amount) && amount.gt(0);
     }
 
+    /**
+     * Typescript helper function to determine if the given argument
+     * is  of a BigNumber or TokenAmount type.
+     * @param amount
+     */
+    private isBigNumber(amount: BigNumber | TokenAmount[]): amount is BigNumber {
+        return (amount as BigNumber)._isBigNumber === true;
+    }
+
+    /**
+     * Given a variable type argument of BigNumber or TokenAmount[]
+     * attempt to determine the correct amount given the current token
+     * @param amount
+     * @param token
+     */
+    private determineAmount(amount: BigNumber|TokenAmount[], token: IToken): BigNumber  {
+        if(this.isBigNumber(amount)){
+            return amount;
+        } else {
+            return amount.filter(_ => _.token.address === token.address).map(_ => _.amount)[0]||BigNumber.from(0);
+        }
+    }
 }

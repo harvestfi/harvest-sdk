@@ -9,6 +9,7 @@ import poolAbi from './abis/pool.json';
 import erc20Abi from './abis/erc20.json';
 import {Vault} from "./vault";
 import {IToken, Token} from "./tokens/token";
+import {TokenAmount} from "./strategies/deposits/TokenAmount";
 
 interface EarnedAmount {
     token: Token,
@@ -114,7 +115,7 @@ export class Pools {
         this.pools = pools;
     }
 
-    findByVault(vault: Vault): Pool {
+    findByVault(vault: Vault<BigNumber|TokenAmount[]>): Pool {
         const pools = this.pools.filter(pool => {
             return pool.collateralAddress === vault.address;
         });

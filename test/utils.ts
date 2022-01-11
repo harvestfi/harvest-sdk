@@ -19,8 +19,3 @@ export const withImpersonation = (impersonationAddress: string) => async <R>(fn:
   });
   return res
 };
-
-export const resetBalance = async (vault: Vault) => {
-  // reset approval
-  await vault.underlyingToken().approve("",BigNumber.from(0));
-};
