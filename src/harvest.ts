@@ -333,7 +333,7 @@ export class HarvestSDK {
      * @param amount
      */
     private isBigNumber(amount: BigNumber | TokenAmount[]): amount is BigNumber {
-        return (<BigNumber>amount)._isBigNumber === true;
+        return (amount as BigNumber)._isBigNumber === true;
     }
 
     /**
