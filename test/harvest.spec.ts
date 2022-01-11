@@ -673,7 +673,6 @@ describe('Harvest SDK', async () => {
                 // sequentially unstake
                 for(let i=0; i<randomPools.length; i++){
                     const pool = randomPools[i].pool;
-                    console.log(pool.name);
 
                     const balance = randomPools[i].balance;
                     const tokens = await harvest.unstakeAndWithdraw(pool, balance);

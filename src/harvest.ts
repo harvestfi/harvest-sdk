@@ -346,7 +346,7 @@ export class HarvestSDK {
         if(this.isBigNumber(amount)){
             return amount;
         } else {
-            return amount.filter(_ => _.token.address == token.address).map(_ => _.amount)[0]||BigNumber.from(0);
+            return amount.filter(_ => _.token.address === token.address).map(_ => _.amount)[0]||BigNumber.from(0);
         }
     }
 }
